@@ -13,8 +13,12 @@ SolObjFullName = namedtuple(
     'SolObjFullName', ('name', 'obj_path', 'param_types'))
 
 
+def fullname2namepath(fullname):
+    return '.'.join(fullname.obj_path + (fullname.name,))
+
+
 def fullname2id(fullname):
-    return '.'.join(fullname.obj_path + (fullname.name,)) + (
+    return fullname2namepath(fullname) + (
         '' if fullname.param_types is None else
         '(' + ','.join(fullname.param_types) + ')'
     )
@@ -29,11 +33,8 @@ contract_re = re.compile(
 
 class SolidityObject(ObjectDescription):
     def add_target_and_index(self, fullname, sig, signode):
-        print(fullname)
         if fullname not in self.state.document.ids:
-            # signode['names'].append(fullname)
             signode['ids'].append(fullname2id(fullname))
-            # signode['first'] = not self.names
             self.state.document.note_explicit_target(signode)
             domaindata = self.env.domaindata['sol']
             if fullname in domaindata:
@@ -46,10 +47,18 @@ class SolidityObject(ObjectDescription):
                     ), line=self.lineno)
                 domaindata[fullname] = (self.env.docname, self.objtype)
 
-        indextext = '{} ({})'.format(fullname.name, self.objtype)
-
-        self.indexnode['entries'].append(
-            ('single', indextext, fullname2id(fullname), False, None))
+        indextext = '{} ({})'.format(fullname2namepath(fullname), self.objtype)
+        if self.objtype == 'constructor' or self.objtype == 'function' and fullname.name == '<fallback>':
+            glossary_classifier = (fullname.obj_path or ('?',))[-1][0].upper()
+        else:
+            glossary_classifier = fullname.name[:1].upper()
+        self.indexnode['entries'].append((
+            'single',
+            indextext,
+            fullname2id(fullname),
+            False,
+            glossary_classifier,
+        ))
 
     def before_content(self):
         if self.names:
@@ -267,24 +276,12 @@ class SolidityEnum(SolidityTypeLike):
 
 class SolidityXRefRole(XRefRole):
     def process_link(self, env, refnode, has_explicit_title, title, target):
-        # type: (BuildEnvironment, nodes.Node, bool, unicode, unicode) -> Tuple[unicode, unicode]  # NOQA
-        # basically what sphinx.domains.python.PyXRefRole does
-        refnode['sol:obj_path'] = env.ref_context.get('sol:obj_path')
-        if not has_explicit_title:
-            title = title.lstrip('.')    # only has a meaning for the target
-            target = target.lstrip('~')  # only has a meaning for the title
-            # if the first character is a tilde, don't display the module/class
-            # parts of the contents
-            if title[0:1] == '~':
-                title = title[1:]
-                dot = title.rfind('.')
-                if dot != -1:
-                    title = title[dot + 1:]
-        # if the first character is a dot, search more specific namespaces first
-        # else search builtins first
-        if target[0:1] == '.':
-            target = target[1:]
-            refnode['refspecific'] = True
+        # type: (BuildEnvironment, nodes.reference, bool, unicode, unicode) -> Tuple[unicode, unicode]  # NOQA
+        """Called after parsing title and target text, and creating the
+        reference node (given in *refnode*).  This method can alter the
+        reference node and must return a new (or the same) ``(title, target)``
+        tuple.
+        """
         return title, target
 
 
@@ -292,19 +289,6 @@ class SolidityDomain(Domain):
     """Solidity language domain."""
     name = 'sol'
     label = 'Solidity'
-
-    object_types = {
-        'contract':     ObjType(_('contract'), 'contract'),
-        'library':      ObjType(_('library'), 'lib'),
-        'interface':    ObjType(_('interface'), 'interface'),
-        'statevar':     ObjType(_('state variable'), 'svar'),
-        'constructor':  ObjType(_('constructor'), 'cons'),
-        'function':     ObjType(_('function'), 'func'),
-        'modifier':     ObjType(_('modifier'), 'mod'),
-        'event':        ObjType(_('event'), 'event'),
-        'struct':       ObjType(_('struct'), 'struct'),
-        'enum':         ObjType(_('enum'), 'enum'),
-    }
 
     directives = {
         'contract':     SolidityTypeLike,
@@ -348,15 +332,6 @@ class SolidityDomain(Domain):
         The method can also raise :exc:`sphinx.environment.NoUri` to suppress
         the :event:`missing-reference` event being emitted.
         """
-
-        # mod_name = node.get('js:module')
-        # prefix = node.get('js:object')
-        # searchorder = node.hasattr('refspecific') and 1 or 0
-        # name, obj = self.find_obj(env, mod_name, prefix, target, typ, searchorder)
-        # if not obj:
-        #     return None
-        # return make_refnode(builder, fromdocname, obj[0],
-        #                     name.replace('$', '_S_'), contnode, name)
 
 
 def setup(app):
