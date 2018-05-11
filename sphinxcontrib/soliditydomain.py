@@ -170,8 +170,8 @@ class SolidityFunctionLike(SolidityObject):
                 name = 'constructor'
                 primary_line += addnodes.desc_name(text=self.objtype)
             elif self.objtype == 'function':
-                name = '(fallback)'
-                primary_line += addnodes.desc_name(text=_('(fallback)'))
+                name = '<fallback>'
+                primary_line += addnodes.desc_name(text=_('<fallback>'))
                 primary_line += nodes.emphasis(text=' ' + self.objtype)
                 if len(arglist_str.strip()) != 0:
                     raise ValueError
