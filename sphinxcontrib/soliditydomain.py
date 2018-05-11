@@ -14,7 +14,41 @@ contract_re = re.compile(
         )? \s*''', re.VERBOSE)
 
 
-class SolidityTypeLike(ObjectDescription):
+class SolidityObject(ObjectDescription):
+    def add_target_and_index(self, name, sig, signode):
+        if name not in self.state.document.ids:
+            signode['names'].append(name)
+            signode['ids'].append(name)
+            signode['first'] = not self.names
+            self.state.document.note_explicit_target(signode)
+            domaindata = self.env.domaindata['sol']
+            if name in domaindata:
+                self.state_machine.reporter.warning(
+                    'duplicate {type} description of {name}, '
+                    'other instance in {otherloc}'.format(
+                        type=self.objtype,
+                        name=name,
+                        otherloc=domaindata[name][0],
+                    ), line=self.lineno)
+                domaindata[name] = (self.env.docname, self.objtype)
+
+        indextext = '{} ({})'.format(name, self.objtype)
+        self.indexnode['entries'].append(('single', indextext, name, '', None))
+
+    def before_content(self):
+        if self.names:
+            objects = self.env.ref_context.setdefault('sol:objects', [])
+            objects.append(self.names.pop().rpartition('.')[2])
+
+    def after_content(self):
+        objects = self.env.ref_context.setdefault('sol:objects', [])
+        try:
+            objects.pop()
+        except IndexError:
+            pass
+
+
+class SolidityTypeLike(SolidityObject):
     def handle_signature(self, sig, signode):
         match = contract_re.fullmatch(sig)
         if match is None:
@@ -31,30 +65,43 @@ class SolidityTypeLike(ObjectDescription):
         if len(parents) > 0:
             signode += nodes.Text(' is ' + ', '.join(parents))
 
-        return name
+        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name])
 
 
-statevar_re = re.compile(
+param_var_re = re.compile(
     r'''\s* ( [\w\s\[\]\(\)=>]+? ) # type
-        (?: \b (public|private|internal) )? # visibility
-        \s+(\w+) # name
+        (?: \s* \b (
+            public | private | internal |
+            storage | memory |
+            indexed
+        ) )? # modifier
+        \s*(\b\w+)? # name
         \s*''', re.VERBOSE)
 
 
-class SolidityStateVariable(ObjectDescription):
+def normalize_type(type_str):
+    type_str = re.sub(r'\s*(\W)', r'\1', type_str)
+    type_str = re.sub(r'(\W)\s*', r'\1', type_str)
+    type_str = re.sub(r'(\w)\s+(\w)', r'\1 \2', type_str)
+    type_str = type_str.replace('mapping(', 'mapping (')
+    type_str = type_str.replace('=>', ' => ')
+    return type_str
+
+
+class SolidityStateVariable(SolidityObject):
     def handle_signature(self, sig, signode):
-        match = statevar_re.fullmatch(sig)
+        match = param_var_re.fullmatch(sig)
 
         if match is None:
             raise ValueError
 
         # normalize type string
         type_str, visibility, name = match.groups()
-        type_str = re.sub(r'\s*(\W)', r'\1', type_str)
-        type_str = re.sub(r'(\W)\s*', r'\1', type_str)
-        type_str = re.sub(r'(\w)\s+(\w)', r'\1 \2', type_str)
-        type_str = type_str.replace('mapping(', 'mapping (')
-        type_str = type_str.replace('=>', ' => ')
+
+        if name is None:
+            raise ValueError
+
+        type_str = normalize_type(type_str)
 
         signode += addnodes.desc_type(text=type_str + ' ')
 
@@ -63,7 +110,7 @@ class SolidityStateVariable(ObjectDescription):
 
         signode += addnodes.desc_name(text=name)
 
-        return name
+        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name])
 
 
 function_re = re.compile(
@@ -73,28 +120,23 @@ function_re = re.compile(
         \s*''', re.VERBOSE)
 
 
-func_arg_re = re.compile(
-    r'''\s* ([\w\[\]]+)  # type
-        (\s+ (?:storage|memory|indexed))?  # memory location
-        (?:\s+ (\w+))?  # name
-        \s*''', re.VERBOSE)
-
-
 def parse_args_into_parameter_list(arglist_str):
     params = addnodes.desc_parameterlist()
 
     if len(arglist_str.strip()) == 0:
         return params
 
-    argmatches = [func_arg_re.fullmatch(
+    argmatches = [param_var_re.fullmatch(
         arg_str) for arg_str in arglist_str.split(',')]
 
     if not all(argmatches):
         raise ValueError
 
     for argmatch in argmatches:
+        atype, memloc, name = argmatch.groups()
+        atype = normalize_type(atype)
         params += addnodes.desc_parameter(
-            text=' '.join(filter(lambda x: x, argmatch.groups())))
+            text=' '.join(filter(lambda x: x, (atype, memloc, name))))
 
     return params
 
@@ -102,14 +144,8 @@ def parse_args_into_parameter_list(arglist_str):
 modifier_re = re.compile(r'(\w+)(?:\s*\(([^)]*)\))?')
 
 
-class SolidityFunctionLike(ObjectDescription):
+class SolidityFunctionLike(SolidityObject):
     doc_field_types = [
-        # Field('visibility', label=_('Visibility'), has_arg=False,
-        #       names=('vis', 'visibility')),
-        # Field('statemutability', label=_('State mutability'), has_arg=False,
-        #       names=('statemut', 'statemutability')),
-        # GroupedField('modifier', label=_('Modifiers'),
-        #              names=('mod', 'modifier')),
         TypedField('parameter', label=_('Parameters'),
                    names=('param', 'parameter', 'arg', 'argument'),
                    typenames=('type',)),
@@ -129,8 +165,10 @@ class SolidityFunctionLike(ObjectDescription):
 
         if name is None:
             if self.objtype == 'constructor':
+                name = 'constructor'
                 primary_line += addnodes.desc_name(text=self.objtype)
             elif self.objtype == 'function':
+                name = '(fallback)'
                 primary_line += addnodes.desc_name(text=_('(fallback)'))
                 primary_line += nodes.emphasis(text=' ' + self.objtype)
                 if len(arglist_str.strip()) != 0:
@@ -176,12 +214,13 @@ class SolidityFunctionLike(ObjectDescription):
 
             signode += newline
 
-        return name
+        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name])
 
 
 class SolidityStruct(SolidityTypeLike):
     doc_field_types = [
-        TypedField('member', label=_('Members'), names=('member',), typenames=('type', )),
+        TypedField('member', label=_('Members'), names=(
+            'member',), typenames=('type', )),
     ]
 
 
