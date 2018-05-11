@@ -120,11 +120,11 @@ function_re = re.compile(
         \s*''', re.VERBOSE)
 
 
-def parse_args_into_parameter_list(arglist_str):
+def _parse_args(arglist_str):
     params = addnodes.desc_parameterlist()
 
     if len(arglist_str.strip()) == 0:
-        return params
+        return params, []
 
     argmatches = [param_var_re.fullmatch(
         arg_str) for arg_str in arglist_str.split(',')]
@@ -132,13 +132,15 @@ def parse_args_into_parameter_list(arglist_str):
     if not all(argmatches):
         raise ValueError
 
+    abi_types = []
     for argmatch in argmatches:
         atype, memloc, name = argmatch.groups()
         atype = normalize_type(atype)
+        abi_types.append(atype + ('' if memloc != 'storage' else ' storage' ))
         params += addnodes.desc_parameter(
             text=' '.join(filter(lambda x: x, (atype, memloc, name))))
 
-    return params
+    return params, abi_types
 
 
 modifier_re = re.compile(r'(\w+)(?:\s*\(([^)]*)\))?')
@@ -179,7 +181,8 @@ class SolidityFunctionLike(SolidityObject):
             primary_line += nodes.emphasis(text=self.objtype + ' ')
             primary_line += addnodes.desc_name(text=name)
 
-        primary_line += parse_args_into_parameter_list(arglist_str)
+        args_parameter_list, args_types = _parse_args(arglist_str)
+        primary_line += args_parameter_list
         signode += primary_line
 
         if self.objtype == 'modifier' and len(modifiers_str.strip()) != 0:
@@ -201,7 +204,7 @@ class SolidityFunctionLike(SolidityObject):
             elif modname == 'returns':
                 newline += nodes.emphasis(text=modname + ' ')
                 if modargs_str is not None:
-                    newline += parse_args_into_parameter_list(modargs_str)
+                    newline += _parse_args(modargs_str)[0]
             else:
                 newline += nodes.Text(modname)
                 if modargs_str is not None:
@@ -214,7 +217,12 @@ class SolidityFunctionLike(SolidityObject):
 
             signode += newline
 
-        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name])
+        if self.objtype in ('function', 'event'):
+            namesuffix = '(' + ','.join(args_types) + ')'
+        else:
+            namesuffix = ''
+
+        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name]) + namesuffix
 
 
 class SolidityStruct(SolidityTypeLike):
@@ -243,7 +251,7 @@ class SolidityDomain(Domain):
         'contract':     ObjType(_('contract'), 'contract'),
         'library':      ObjType(_('library'), 'lib'),
         'interface':    ObjType(_('interface'), 'interface'),
-        'statevar':     ObjType(_('statevar'), 'svar'),
+        'statevar':     ObjType(_('state variable'), 'svar'),
         'constructor':  ObjType(_('constructor'), 'cons'),
         'function':     ObjType(_('function'), 'func'),
         'modifier':     ObjType(_('modifier'), 'mod'),
