@@ -1,4 +1,5 @@
 import re
+from collections import namedtuple
 from docutils import nodes
 from sphinx import addnodes
 from sphinx.directives import ObjectDescription
@@ -6,6 +7,18 @@ from sphinx.domains import Domain, ObjType
 from sphinx.locale import _
 from sphinx.roles import XRefRole
 from sphinx.util.docfields import Field, GroupedField, TypedField
+from sphinx.util.nodes import make_refnode
+
+SolObjFullName = namedtuple(
+    'SolObjFullName', ('name', 'obj_path', 'param_types'))
+
+
+def fullname2id(fullname):
+    return '.'.join(fullname.obj_path + (fullname.name,)) + (
+        '' if fullname.param_types is None else
+        '(' + ','.join(fullname.param_types) + ')'
+    )
+
 
 contract_re = re.compile(
     r'''\s* (\w+)  # name
@@ -15,35 +28,38 @@ contract_re = re.compile(
 
 
 class SolidityObject(ObjectDescription):
-    def add_target_and_index(self, name, sig, signode):
-        if name not in self.state.document.ids:
-            signode['names'].append(name)
-            signode['ids'].append(name)
-            signode['first'] = not self.names
+    def add_target_and_index(self, fullname, sig, signode):
+        print(fullname)
+        if fullname not in self.state.document.ids:
+            # signode['names'].append(fullname)
+            signode['ids'].append(fullname2id(fullname))
+            # signode['first'] = not self.names
             self.state.document.note_explicit_target(signode)
             domaindata = self.env.domaindata['sol']
-            if name in domaindata:
+            if fullname in domaindata:
                 self.state_machine.reporter.warning(
-                    'duplicate {type} description of {name}, '
+                    'duplicate {type} description of {fullname}, '
                     'other instance in {otherloc}'.format(
                         type=self.objtype,
-                        name=name,
-                        otherloc=domaindata[name][0],
+                        fullname=fullname,
+                        otherloc=domaindata[fullname][0],
                     ), line=self.lineno)
-                domaindata[name] = (self.env.docname, self.objtype)
+                domaindata[fullname] = (self.env.docname, self.objtype)
 
-        indextext = '{} ({})'.format(name, self.objtype)
-        self.indexnode['entries'].append(('single', indextext, name, '', None))
+        indextext = '{} ({})'.format(fullname.name, self.objtype)
+
+        self.indexnode['entries'].append(
+            ('single', indextext, fullname2id(fullname), False, None))
 
     def before_content(self):
         if self.names:
-            objects = self.env.ref_context.setdefault('sol:objects', [])
-            objects.append(self.names.pop().rpartition('.')[2])
+            obj_path = self.env.ref_context.setdefault('sol:obj_path', [])
+            obj_path.append(self.names.pop().name)
 
     def after_content(self):
-        objects = self.env.ref_context.setdefault('sol:objects', [])
+        obj_path = self.env.ref_context.setdefault('sol:obj_path', [])
         try:
-            objects.pop()
+            obj_path.pop()
         except IndexError:
             pass
 
@@ -65,7 +81,11 @@ class SolidityTypeLike(SolidityObject):
         if len(parents) > 0:
             signode += nodes.Text(' is ' + ', '.join(parents))
 
-        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name])
+        return SolObjFullName(
+            name=name,
+            obj_path=tuple(self.env.ref_context.get('sol:obj_path', [])),
+            param_types=None,
+        )
 
 
 param_var_re = re.compile(
@@ -110,37 +130,41 @@ class SolidityStateVariable(SolidityObject):
 
         signode += addnodes.desc_name(text=name)
 
-        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name])
+        return SolObjFullName(
+            name=name,
+            obj_path=tuple(self.env.ref_context.get('sol:obj_path', [])),
+            param_types=None,
+        )
 
 
 function_re = re.compile(
     r'''\s* (\w+)?  # name
-        \s* \( ([^)]*) \)  # arglist
+        \s* \( ([^)]*) \)  # paramlist
         \s* ((?:\w+ \s* (?:\([^)]*\))? \s* )*)  # modifiers
         \s*''', re.VERBOSE)
 
 
-def _parse_args(arglist_str):
+def _parse_params(paramlist_str):
     params = addnodes.desc_parameterlist()
 
-    if len(arglist_str.strip()) == 0:
-        return params, []
+    if len(paramlist_str.strip()) == 0:
+        return params, tuple()
 
-    argmatches = [param_var_re.fullmatch(
-        arg_str) for arg_str in arglist_str.split(',')]
+    parammatches = [param_var_re.fullmatch(
+        param_str) for param_str in paramlist_str.split(',')]
 
-    if not all(argmatches):
+    if not all(parammatches):
         raise ValueError
 
     abi_types = []
-    for argmatch in argmatches:
-        atype, memloc, name = argmatch.groups()
+    for parammatch in parammatches:
+        atype, memloc, name = parammatch.groups()
         atype = normalize_type(atype)
-        abi_types.append(atype + ('' if memloc != 'storage' else ' storage' ))
+        abi_types.append(atype + ('' if memloc != 'storage' else ' storage'))
         params += addnodes.desc_parameter(
             text=' '.join(filter(lambda x: x, (atype, memloc, name))))
 
-    return params, abi_types
+    return params, tuple(abi_types)
 
 
 modifier_re = re.compile(r'(\w+)(?:\s*\(([^)]*)\))?')
@@ -149,7 +173,7 @@ modifier_re = re.compile(r'(\w+)(?:\s*\(([^)]*)\))?')
 class SolidityFunctionLike(SolidityObject):
     doc_field_types = [
         TypedField('parameter', label=_('Parameters'),
-                   names=('param', 'parameter', 'arg', 'argument'),
+                   names=('param', 'parameter', 'param', 'paramument'),
                    typenames=('type',)),
         TypedField('returnvalue', label=_('Returns'),
                    names=('return', 'returns'),
@@ -163,7 +187,7 @@ class SolidityFunctionLike(SolidityObject):
         if match is None:
             raise ValueError
 
-        name, arglist_str, modifiers_str = match.groups()
+        name, paramlist_str, modifiers_str = match.groups()
 
         if name is None:
             if self.objtype == 'constructor':
@@ -173,7 +197,7 @@ class SolidityFunctionLike(SolidityObject):
                 name = '<fallback>'
                 primary_line += addnodes.desc_name(text=_('<fallback>'))
                 primary_line += nodes.emphasis(text=' ' + self.objtype)
-                if len(arglist_str.strip()) != 0:
+                if len(paramlist_str.strip()) != 0:
                     raise ValueError
             else:
                 raise ValueError
@@ -181,15 +205,15 @@ class SolidityFunctionLike(SolidityObject):
             primary_line += nodes.emphasis(text=self.objtype + ' ')
             primary_line += addnodes.desc_name(text=name)
 
-        args_parameter_list, args_types = _parse_args(arglist_str)
-        primary_line += args_parameter_list
+        params_parameter_list, param_types = _parse_params(paramlist_str)
+        primary_line += params_parameter_list
         signode += primary_line
 
         if self.objtype == 'modifier' and len(modifiers_str.strip()) != 0:
             raise ValueError
 
         for match in modifier_re.finditer(modifiers_str):
-            modname, modargs_str = match.groups()
+            modname, modparams_str = match.groups()
             newline = addnodes.desc_signature_line()
             newline += nodes.Text(' ')  # HACK: special whitespace :/
             if modname in (
@@ -199,30 +223,33 @@ class SolidityFunctionLike(SolidityObject):
                 'anonymous',
             ):
                 newline += nodes.emphasis(text=modname)
-                if modargs_str is not None:
+                if modparams_str is not None:
                     raise ValueError
             elif modname == 'returns':
                 newline += nodes.emphasis(text=modname + ' ')
-                if modargs_str is not None:
-                    newline += _parse_args(modargs_str)[0]
+                if modparams_str is not None:
+                    newline += _parse_params(modparams_str)[0]
             else:
                 newline += nodes.Text(modname)
-                if modargs_str is not None:
-                    marglist = addnodes.desc_parameterlist()
-                    for marg in modargs_str.split(','):
-                        marg = marg.strip()
-                        if marg:
-                            marglist += addnodes.desc_parameter(text=marg)
-                    newline += marglist
+                if modparams_str is not None:
+                    modparamlist = addnodes.desc_parameterlist()
+                    for modparam in modparams_str.split(','):
+                        modparam = modparam.strip()
+                        if modparam:
+                            modparamlist += addnodes.desc_parameter(
+                                text=modparam)
+                    newline += modparamlist
 
             signode += newline
 
-        if self.objtype in ('function', 'event'):
-            namesuffix = '(' + ','.join(args_types) + ')'
-        else:
-            namesuffix = ''
+        if self.objtype not in ('function', 'event'):
+            param_types = None
 
-        return '.'.join(self.env.ref_context.get('sol:objects', []) + [name]) + namesuffix
+        return SolObjFullName(
+            name=name,
+            obj_path=tuple(self.env.ref_context.get('sol:obj_path', [])),
+            param_types=param_types,
+        )
 
 
 class SolidityStruct(SolidityTypeLike):
@@ -239,7 +266,26 @@ class SolidityEnum(SolidityTypeLike):
 
 
 class SolidityXRefRole(XRefRole):
-    pass
+    def process_link(self, env, refnode, has_explicit_title, title, target):
+        # type: (BuildEnvironment, nodes.Node, bool, unicode, unicode) -> Tuple[unicode, unicode]  # NOQA
+        # basically what sphinx.domains.python.PyXRefRole does
+        refnode['sol:obj_path'] = env.ref_context.get('sol:obj_path')
+        if not has_explicit_title:
+            title = title.lstrip('.')    # only has a meaning for the target
+            target = target.lstrip('~')  # only has a meaning for the title
+            # if the first character is a tilde, don't display the module/class
+            # parts of the contents
+            if title[0:1] == '~':
+                title = title[1:]
+                dot = title.rfind('.')
+                if dot != -1:
+                    title = title[dot + 1:]
+        # if the first character is a dot, search more specific namespaces first
+        # else search builtins first
+        if target[0:1] == '.':
+            target = target[1:]
+            refnode['refspecific'] = True
+        return title, target
 
 
 class SolidityDomain(Domain):
@@ -285,6 +331,32 @@ class SolidityDomain(Domain):
         'struct':       SolidityXRefRole(),
         'enum':         SolidityXRefRole(),
     }
+
+    def resolve_xref(self, env, fromdocname, builder,
+                     typ, target, node, contnode):
+        # type: (BuildEnvironment, unicode, Builder, unicode, unicode, nodes.Node, nodes.Node) -> nodes.Node  # NOQA
+        """Resolve the pending_xref *node* with the given *typ* and *target*.
+
+        This method should return a new node, to replace the xref node,
+        containing the *contnode* which is the markup content of the
+        cross-reference.
+
+        If no resolution can be found, None can be returned; the xref node will
+        then given to the :event:`missing-reference` event, and if that yields no
+        resolution, replaced by *contnode*.
+
+        The method can also raise :exc:`sphinx.environment.NoUri` to suppress
+        the :event:`missing-reference` event being emitted.
+        """
+
+        # mod_name = node.get('js:module')
+        # prefix = node.get('js:object')
+        # searchorder = node.hasattr('refspecific') and 1 or 0
+        # name, obj = self.find_obj(env, mod_name, prefix, target, typ, searchorder)
+        # if not obj:
+        #     return None
+        # return make_refnode(builder, fromdocname, obj[0],
+        #                     name.replace('$', '_S_'), contnode, name)
 
 
 def setup(app):

@@ -5,7 +5,9 @@ Solidity Domain Acceptance Tests
 
 .. contract:: Thing is Something, SomeOtherThing, Ohman
 
-   fjieafdsa
+   :func:`realTalk`
+
+   :func:`Thing.realTalk(string[],bytes32[8] storage)`
 
    :title: It does a thing
    :author: Some guy
