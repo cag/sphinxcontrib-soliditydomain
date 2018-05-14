@@ -36,5 +36,5 @@ setup(
 
     keywords='sphinx solidity domain contrib documentation generator plugin',
 
-    py_modules=['sphinxcontrib.soliditydomain'],
+    packages=['sphinxcontrib.soliditydomain'],
 )

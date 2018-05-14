@@ -24,13 +24,6 @@ def fullname2id(fullname):
     )
 
 
-contract_re = re.compile(
-    r'''\s* (\w+)  # name
-        (?: \s+ is \s+
-            (\w+ (?:\s*,\s* (?:\w+))*)  # parent contracts
-        )? \s*''', re.VERBOSE)
-
-
 class SolidityObject(ObjectDescription):
     def add_target_and_index(self, fullname, sig, signode):
         if fullname not in self.state.document.ids:
@@ -47,8 +40,9 @@ class SolidityObject(ObjectDescription):
                     ), line=self.lineno)
                 domaindata[fullname] = (self.env.docname, self.objtype)
 
-        indextext = '{} ({})'.format(fullname2namepath(fullname), self.objtype)
-        if self.objtype == 'constructor' or self.objtype == 'function' and fullname.name == '<fallback>':
+        indextext = '{} ({})'.format(fullname2namepath(fullname), _(self.objtype))
+        if (self.objtype == 'constructor' or
+                self.objtype == 'function' and fullname.name == '<fallback>'):
             glossary_classifier = (fullname.obj_path or ('?',))[-1][0].upper()
         else:
             glossary_classifier = fullname.name[:1].upper()
@@ -71,6 +65,13 @@ class SolidityObject(ObjectDescription):
             obj_path.pop()
         except IndexError:
             pass
+
+
+contract_re = re.compile(
+    r'''\s* (\w+)  # name
+        (?: \s+ is \s+
+            (\w+ (?:\s*,\s* (?:\w+))*)  # parent contracts
+        )? \s*''', re.VERBOSE)
 
 
 class SolidityTypeLike(SolidityObject):
@@ -332,7 +333,3 @@ class SolidityDomain(Domain):
         The method can also raise :exc:`sphinx.environment.NoUri` to suppress
         the :event:`missing-reference` event being emitted.
         """
-
-
-def setup(app):
-    app.add_domain(SolidityDomain)

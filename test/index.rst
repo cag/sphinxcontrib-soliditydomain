@@ -11,6 +11,7 @@ Welcome to Solidity Domain Test's documentation!
    :caption: Contents:
 
    test
+   auto
 
 
 Indices and tables

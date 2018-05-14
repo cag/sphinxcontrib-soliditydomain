@@ -1,0 +1,4 @@
+Autodoc Tests
+=============
+
+.. autocontract:: WTFStarWar

@@ -40,7 +40,7 @@ release = ''
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinxcontrib.soliditydomain'
+    'sphinxcontrib.soliditydomain',
 ]
 
 primary_domain = 'sol'
@@ -159,3 +159,5 @@ texinfo_documents = [
 
 
 # -- Extension configuration -------------------------------------------------
+import os
+autodoc_lookup_path = os.path.join('..', 'testcontracts')

@@ -1,7 +1,5 @@
-Solidity Domain Acceptance Tests
-================================
-
-.. default-domain:: sol
+Acceptance Tests
+================
 
 .. contract:: Thing is Something, SomeOtherThing, Ohman
 
