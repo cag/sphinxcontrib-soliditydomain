@@ -26,7 +26,6 @@ contract BugBunny {
     function doesEat(string _food) public view returns (bool) {
         return keccak256(_food) == carrotHash;
     }
-}
 
     /// @author Funk Master
     /// @dev Magic funk machine wow.

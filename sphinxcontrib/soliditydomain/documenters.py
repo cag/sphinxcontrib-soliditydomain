@@ -9,9 +9,8 @@ def build_source_index(app):
     for root, dirs, files in os.walk(lookup_path):
         for name in files:
             if name.lower().endswith('.sol'):
-                with open(os.path.join(root, name)) as file:
-                    src = file.read()
-                    print(parse_sol(src))
+                print('---', name, '---')
+                parse_sol(os.path.join(root, name))
 
 
 class ContractDocumenter(Documenter):

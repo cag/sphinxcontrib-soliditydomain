@@ -1,13 +1,22 @@
-import re
-
-definitions_re = re.compile(
-    r'''
-        \b (contract | library | interface |
-        constructor | function |
-        modifier | event | struct | enum) \b
-        ([^;{]*)
-    ''', re.VERBOSE | re.MULTILINE)
+from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
+from .SolidityLexer import SolidityLexer
+from .SolidityParser import SolidityParser
+from .SolidityListener import SolidityListener
 
 
-def parse_sol(src):
-    return definitions_re.findall(src)
+class DefinitionsRecorder(SolidityListener):
+    def enterContractDefinition(self, ctx):
+        print(*ctx.parser._input.getHiddenTokensToLeft(ctx.start.tokenIndex))
+        print(ctx.identifier().start)
+        pass
+
+
+def parse_sol(srcpath):
+    src = FileStream(srcpath)
+    lexer = SolidityLexer(src)
+    stream = CommonTokenStream(lexer)
+    parser = SolidityParser(stream)
+    tree = parser.sourceUnit()
+    recorder = DefinitionsRecorder()
+    walker = ParseTreeWalker()
+    walker.walk(recorder, tree)
