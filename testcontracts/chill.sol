@@ -71,3 +71,37 @@ contract StarWar {
     function() external {}
     function pew(uint) public pure returns(uint);
 }
+
+interface ERC20 {
+    function totalSupply() external constant returns (uint);
+    function balanceOf(address tokenOwner) external constant returns (uint balance);
+    function allowance(address tokenOwner, address spender) external constant returns (uint remaining);
+    function transfer(address to, uint tokens) external returns (bool success);
+    function approve(address spender, uint tokens) external returns (bool success);
+    function transferFrom(address from, address to, uint tokens) external returns (bool success);
+
+    event Transfer(address indexed from, address indexed to, uint tokens);
+    event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
+}
+
+contract Migrations {
+  address public owner;
+  uint public last_completed_migration;
+
+  modifier restricted() {
+    if (msg.sender == owner) _;
+  }
+
+  constructor() restricted {
+    owner = msg.sender;
+  }
+
+  function setCompleted(uint completed) restricted {
+    last_completed_migration = completed;
+  }
+
+  function upgrade(address new_address) restricted {
+    Migrations upgraded = Migrations(new_address);
+    upgraded.setCompleted(last_completed_migration);
+  }
+}
