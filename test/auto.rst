@@ -1,4 +1,4 @@
 Autodoc Tests
 =============
 
-.. autocontract:: WTFStarWar
+.. autocontract:: Kombucha
