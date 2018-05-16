@@ -17,6 +17,64 @@ def format_ctx_list(ctx_list):
         for pctx in ctx_list) + ')'
 
 
+def construct_signature_for_function_like(ctx):
+    param_list = format_ctx_list(
+        ctx.parameterList().parameter()
+
+        if hasattr(ctx, 'parameterList')
+        and ctx.parameterList() is not None else
+
+
+        ctx.eventParameterList().eventParameter()
+
+        if hasattr(ctx, 'eventParameterList') else
+
+        None
+    )
+    return ' '.join((
+        '{} {}{}'.format(
+            ctx.start.text,
+            ctx.identifier().getText(),
+            param_list,
+        )
+        if hasattr(ctx, 'identifier')
+        and ctx.identifier() is not None
+        else
+        '{}{}'.format(
+            ctx.start.text,
+            param_list,
+        ),
+        *(
+            ('{}{}'.format(
+                child.identifier().getText(),
+                format_ctx_list(child.expressionList().expression()),
+            ) if isinstance(
+                child,
+                SolidityParser.ModifierInvocationContext,
+            ) and child.expressionList() is not None else
+                child.getText()
+                for child in ctx.modifierList().getChildren())
+            if hasattr(ctx, 'modifierList') else
+            ()
+        ),
+        *(
+            (ctx.AnonymousKeyword().getText(),)
+            if hasattr(ctx, 'AnonymousKeyword')
+            and ctx.AnonymousKeyword() is not None else
+            ()
+        ),
+        *(
+            ('{} {}'.format(
+                ctx.returnParameters().start.text, format_ctx_list(
+                    ctx.returnParameters().parameterList().parameter())),)
+            if hasattr(ctx, 'returnParameters')
+            and ctx.returnParameters() is not None
+            else
+            ()
+        ),
+    ))
+
+
 class DefinitionsRecorder(SolidityListener):
     def __init__(self):
         self.current_contract_ctx = None
@@ -28,7 +86,7 @@ class DefinitionsRecorder(SolidityListener):
                 self.current_contract_ctx.identifier().getText()))
 
         # print(*(ctx.parser._input.getHiddenTokensToLeft(ctx.start.tokenIndex) or ()))
-        fullname = ' '.join((
+        signature = ' '.join((
             ctx.start.text,
             ctx.identifier().getText(),
             *(ctx.inheritanceSpecifier() and
@@ -39,75 +97,69 @@ class DefinitionsRecorder(SolidityListener):
 
         self.current_contract_ctx = ctx
 
-        print(fullname)
+        # print(signature)
 
     def exitContractDefinition(self, ctx):
         self.current_contract_ctx = None
 
     def enterStateVariableDeclaration(self, ctx):
-        fullname = ' '.join(
+        signature = ' '.join(
             child.getText() for child in takewhile(
                 lambda child: child.getText() not in ('=', ';'),
                 ctx.getChildren(),
             )
         )
 
-        # print('   ', fullname)
+        # print('   ', signature)
 
     def enterConstructorDefinition(self, ctx):
-        self.enterFunctionDefinition(ctx)
-
-        # print('   ', fullname)
+        signature = construct_signature_for_function_like(ctx)
+        # print('   ', signature)
 
     def enterFunctionDefinition(self, ctx):
-        fullname = ' '.join((
-            '{} {}{}'.format(
-                ctx.start.text,
-                ctx.identifier().getText(),
-                format_ctx_list(ctx.parameterList().parameter()
-                                if hasattr(ctx, 'parameterList')
-                                and ctx.parameterList() is not None else None),
-            )
-            if hasattr(ctx, 'identifier')
-            and ctx.identifier() is not None
-            else
-            '{}{}'.format(
-                ctx.start.text,
-                format_ctx_list(ctx.parameterList().parameter()
-                                if hasattr(ctx, 'parameterList')
-                                and ctx.parameterList() is not None else None),
-            ),
-            *(
-                ('{}{}'.format(
-                    child.identifier().getText(),
-                    format_ctx_list(child.expressionList().expression()),
-                ) if isinstance(
-                    child,
-                    SolidityParser.ModifierInvocationContext,
-                ) and child.expressionList() is not None else
-                    child.getText()
-                    for child in ctx.modifierList().getChildren())
-                if hasattr(ctx, 'modifierList') else
-                ()
-            ),
-            *(
-                ('{} {}'.format(
-                    ctx.returnParameters().start.text, format_ctx_list(
-                        ctx.returnParameters().parameterList().parameter())),)
-                if hasattr(ctx, 'returnParameters')
-                and ctx.returnParameters() is not None
-                else
-                ()
-            ),
-        ))
-
-        print('   ', fullname)
+        signature = construct_signature_for_function_like(ctx)
+        # print('   ', signature)
 
     def enterModifierDefinition(self, ctx):
-        self.enterFunctionDefinition(ctx)
+        signature = construct_signature_for_function_like(ctx)
+        # print('   ', signature)
 
     def enterEventDefinition(self, ctx):
-        self.enterFunctionDefinition(ctx)
+        signature = construct_signature_for_function_like(ctx)
+        # print('   ', signature)
+
+    def enterStructDefinition(self, ctx):
+        signature = ' '.join((
+            ctx.start.text,
+            ctx.identifier().getText(),
+        ))
+
+        members = tuple(
+            ' '.join(
+                child.getText()
+                for child in vdctx.getChildren()
+            )
+            for vdctx in ctx.variableDeclaration()
+        )
+
+        # print('   ', signature)
+        # for member in members:
+        #     print('       ', member)
+
+    def enterEnumDefinition(self, ctx):
+        signature = ' '.join((
+            ctx.start.text,
+            ctx.identifier().getText(),
+        ))
+
+        members = tuple(
+            enum_val.getText()
+            for enum_val in ctx.enumValue()
+        )
+
+        # print('   ', signature)
+        # for member in members:
+        #     print('       ', member)
 
 
 def parse_sol(srcpath):
