@@ -1,9 +1,51 @@
+import os
+import posixpath
 from itertools import takewhile
 from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
 from antlr4.tree.Tree import TerminalNodeImpl
+from peewee import Model, CharField, TextField, SqliteDatabase
 from .SolidityLexer import SolidityLexer
 from .SolidityParser import SolidityParser
 from .SolidityListener import SolidityListener
+
+db = SqliteDatabase(':memory:')
+
+
+class SolidityObject(Model):
+    objtype = CharField()
+    file = CharField()
+    signature = CharField()
+    name = CharField()
+    vartype = CharField()
+    paramtypes = CharField()
+    contract_name = CharField()
+    docs = TextField()
+
+    class Meta:
+        database = db
+
+
+def remove_prefix(text, prefix):
+    # https://stackoverflow.com/a/16891418
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text
+
+
+def build_source_registry(app):
+    db.connect()
+    db.create_tables((SolidityObject,))
+
+    lookup_path = app.env.config.autodoc_lookup_path
+
+    for root, dirs, files in os.walk(lookup_path):
+        for name in files:
+            if os.path.splitext(name)[1].lower() == '.sol':
+                parse_sol(os.path.join(root, name), relsrcpath=remove_prefix(
+                    posixpath.join(
+                        posixpath.relpath(root, lookup_path),
+                        name),
+                    './'))
 
 
 def format_ctx_list(ctx_list):
@@ -76,8 +118,9 @@ def construct_signature_for_function_like(ctx):
 
 
 class DefinitionsRecorder(SolidityListener):
-    def __init__(self):
+    def __init__(self, source_unit_name):
         self.current_contract_ctx = None
+        self.source_unit_name = source_unit_name
 
     def enterContractDefinition(self, ctx):
         if self.current_contract_ctx is not None:
@@ -162,12 +205,12 @@ class DefinitionsRecorder(SolidityListener):
         #     print('       ', member)
 
 
-def parse_sol(srcpath):
+def parse_sol(srcpath, relsrcpath):
     src = FileStream(srcpath, encoding='utf8')
     lexer = SolidityLexer(src)
     stream = CommonTokenStream(lexer)
     parser = SolidityParser(stream)
     tree = parser.sourceUnit()
-    recorder = DefinitionsRecorder()
+    recorder = DefinitionsRecorder(relsrcpath)
     walker = ParseTreeWalker()
     walker.walk(recorder, tree)

@@ -1,23 +1,21 @@
 import os
 
 from .domain import SolidityDomain
-from .documenters import all_solidity_documenters, build_source_index
+from .documenters import all_solidity_documenters
+from .sourceregistry import build_source_registry
 
 
 def setup(app):
-    app.add_domain(SolidityDomain)
-    for documenter in all_solidity_documenters:
-        app.add_autodocumenter(documenter)
-
     app.add_config_value('autodoc_lookup_path',
                          os.path.join('..', 'contracts'), 'env')
 
-    app.connect('builder-inited', builder_inited_handler)
+    app.add_domain(SolidityDomain)
+
+    app.connect('builder-inited', build_source_registry)
     app.connect('env-before-read-docs', read_all_docs)
 
-
-def builder_inited_handler(app):
-    build_source_index(app)
+    for documenter in all_solidity_documenters:
+        app.add_autodocumenter(documenter)
 
 
 def read_all_docs(app, env, doc_names):
