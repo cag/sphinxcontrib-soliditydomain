@@ -1,6 +1,8 @@
+import json
 import os
 import posixpath
 import re
+from collections import OrderedDict
 from itertools import takewhile
 from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
 from antlr4.tree.Tree import TerminalNodeImpl
@@ -49,20 +51,6 @@ def build_source_registry(app):
 
 
 def teardown_source_registry(app, exception):
-    # for obj in (
-    #     SolidityObject.select()
-    #     .where(SolidityObject.objtype.in_(('event',)))
-    # ):
-    #     print(
-    #         obj.file,
-    #         obj.objtype,
-    #         obj.signature,
-    #         obj.contract_name,
-    #         obj.name,
-    #         obj.paramtypes,
-    #     )
-    #     print(obj.docs)
-    #     print()
     db.close()
 
 
@@ -106,6 +94,14 @@ def get_docs_from_comments_for_obj(ctx):
                 else:
                     doclines.append(line)
 
+    def prep_payload_docs(docs):
+        docs = docs.strip()
+        lines = docs.splitlines()
+        if len(lines) == 1:
+            lines[0] = remove_prefix(lines[0], '-').lstrip()
+        # HACK?: indent after first line
+        return '\n   '.join(lines)
+
     for tagmatch in tag_re.finditer(rawdocs):
         tagname, tagpayload = tagmatch.groups()
 
@@ -114,14 +110,23 @@ def get_docs_from_comments_for_obj(ctx):
         elif tagname == 'param':
             pmatch = param_re.fullmatch(tagpayload)
             pname, pdocs = pmatch.groups()
-            pdocs = remove_prefix(pdocs, '-').strip()
-            pdoclines = pdocs.splitlines()
             options.append(':{} {}: {}'.format(
                 tagname, pname,
-                '\n   '.join(pdoclines),  # HACK?: indent after first line
+                prep_payload_docs(pdocs),
             ))
+        elif tagname == 'return':
+            try:
+                returns = json.loads(tagpayload, object_pairs_hook=OrderedDict)
+                for ret_name, ret_docs in returns.items():
+                    options.append(':{} {}: {}'.format(
+                        tagname, ret_name,
+                        prep_payload_docs(ret_docs)))
+            except json.JSONDecodeError:
+                options.append(':{}: {}'.format(
+                    tagname, prep_payload_docs(tagpayload)))
         else:
-            options.append(':{}: {}'.format(tagname, tagpayload).strip())
+            options.append(':{}: {}'.format(
+                tagname, prep_payload_docs(tagpayload)))
 
     moredocs = demux_and_append_docs(tag_re.sub('', rawdocs))
 

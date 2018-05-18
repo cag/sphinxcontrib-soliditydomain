@@ -15,10 +15,6 @@ class SolidityObjectDocumenter(Documenter):
         'exclude-members': members_set_option,
     }
 
-    def add_line(self, *args, **kwargs):
-        print('add_line', args[0])
-        super().add_line(*args, **kwargs)
-
     def get_sourcename(self):
         return '{}:docstring of {} {}'.format(
             self.object.file,

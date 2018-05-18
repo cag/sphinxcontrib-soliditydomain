@@ -11,3 +11,7 @@ Autodoc Tests
    :undoc-members:
 
 .. autosolfunction:: Kombucha.drink
+
+.. autosolcontract:: WTFBugBunny
+   :members:
+   :undoc-members:
