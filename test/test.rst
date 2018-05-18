@@ -27,6 +27,7 @@ Acceptance Tests
       This constructor does some stuff yo
 
       :param proxy: address to proxy to
+        stuff and things because reasons and stuff
 
    .. function:: () external payable
 

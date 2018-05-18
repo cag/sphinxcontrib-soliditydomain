@@ -15,6 +15,10 @@ class SolidityObjectDocumenter(Documenter):
         'exclude-members': members_set_option,
     }
 
+    def add_line(self, *args, **kwargs):
+        print('add_line', args[0])
+        super().add_line(*args, **kwargs)
+
     def get_sourcename(self):
         return '{}:docstring of {} {}'.format(
             self.object.file,
@@ -40,11 +44,14 @@ class SolidityObjectDocumenter(Documenter):
         """Add content from source docs and user."""
         sourcename = self.get_sourcename()
 
-        for line in self.object.docs.splitlines():
-            self.add_line(line, sourcename)
+        if self.object.docs:
+            self.add_line('', sourcename)
+            for line in self.object.docs.splitlines():
+                self.add_line(line, sourcename)
 
         # add additional content (e.g. from document), if present
         if more_content:
+            self.add_line('', sourcename)
             for line, src in zip(more_content.data, more_content.items):
                 self.add_line(line, src[0], src[1])
 
@@ -151,7 +158,6 @@ class SolidityObjectDocumenter(Documenter):
 
         # generate the directive header and options, if applicable
         self.add_directive_header()
-        self.add_line('', sourcename)
 
         # make sure content is indented
         # TODO: consider adding a source unit directive
@@ -162,6 +168,7 @@ class SolidityObjectDocumenter(Documenter):
 
         # document members, if possible
         if directive in ('contract', 'interface', 'library'):
+            self.add_line('', sourcename)
             self.document_members(all_members)
 
 

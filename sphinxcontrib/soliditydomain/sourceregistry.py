@@ -49,42 +49,88 @@ def build_source_registry(app):
 
 
 def teardown_source_registry(app, exception):
-    for obj in (
-        SolidityObject.select()
-        .where(SolidityObject.objtype.in_(('event',)))
-    ):
-        print(
-            obj.file,
-            obj.objtype,
-            # obj.signature,
-            obj.contract_name,
-            obj.name,
-            obj.paramtypes,
-        )
-        # print(obj.docs)
-        # print()
+    # for obj in (
+    #     SolidityObject.select()
+    #     .where(SolidityObject.objtype.in_(('event',)))
+    # ):
+    #     print(
+    #         obj.file,
+    #         obj.objtype,
+    #         obj.signature,
+    #         obj.contract_name,
+    #         obj.name,
+    #         obj.paramtypes,
+    #     )
+    #     print(obj.docs)
+    #     print()
     db.close()
 
 
-comment_line_re = re.compile(
-    r'''
-        ^ (?: /{3,} | /\*{2,} | is )
-    ''', re.VERBOSE)
+tag_re = re.compile(
+    r''' @ (\w+)
+        \s+
+        ( [^@]+ (?: (?: (?<! \s) @ | @ \s) [^@]+)* )
+    ''',
+    re.VERBOSE | re.MULTILINE | re.DOTALL
+)
+
+param_re = re.compile(
+    r'(\S*)\s*(.*)',
+    re.MULTILINE | re.DOTALL
+)
 
 
 def get_docs_from_comments_for_obj(ctx):
-    lines = []
+    rawlines = []
 
     for comment in ctx.parser._input.getHiddenTokensToLeft(
         ctx.start.tokenIndex
     ) or ():
         if comment.text.startswith('///'):
-            lines.append(comment.text[3:].strip())
+            rawlines.append(comment.text[3:].strip())
         elif comment.text.startswith('/**'):
             for rawline in comment.text[3:-2].splitlines():
-                lines.append(rawline.strip().lstrip('*').lstrip())
+                rawlines.append(rawline.strip().lstrip('*').lstrip())
 
-    return '\n'.join(lines)
+    rawdocs = '\n'.join(rawlines)
+
+    doclines = []
+    options = []
+
+    def demux_and_append_docs(docs):
+        docs = docs.strip()
+        if docs:
+            for line in docs.splitlines():
+                if line.startswith(':'):
+                    options.append(line)
+                else:
+                    doclines.append(line)
+
+    for tagmatch in tag_re.finditer(rawdocs):
+        tagname, tagpayload = tagmatch.groups()
+
+        if tagname == 'dev':
+            demux_and_append_docs(tagpayload)
+        elif tagname == 'param':
+            pmatch = param_re.fullmatch(tagpayload)
+            pname, pdocs = pmatch.groups()
+            pdocs = remove_prefix(pdocs, '-').strip()
+            pdoclines = pdocs.splitlines()
+            options.append(':{} {}: {}'.format(
+                tagname, pname,
+                '\n   '.join(pdoclines),  # HACK?: indent after first line
+            ))
+        else:
+            options.append(':{}: {}'.format(tagname, tagpayload).strip())
+
+    moredocs = demux_and_append_docs(tag_re.sub('', rawdocs))
+
+    if moredocs:
+        doclines.append(moredocs)
+
+    return '\n\n'.join(filter(lambda x: x,
+                              map('\n'.join, (doclines, options))))
+
 
 def format_ctx_list(ctx_list):
     if ctx_list is None:
@@ -95,7 +141,6 @@ def format_ctx_list(ctx_list):
             child.getText()
             for child in pctx.getChildren())
         for pctx in ctx_list) + ')'
-
 
 
 class DefinitionsRecorder(SolidityListener):
@@ -167,7 +212,8 @@ class DefinitionsRecorder(SolidityListener):
         if params is None:
             paramtypes = None
         else:
-            paramtypes = ','.join(param.typeName().getText() for param in params)
+            paramtypes = ','.join(param.typeName().getText()
+                                  for param in params)
 
         params_str = format_ctx_list(params)
 
