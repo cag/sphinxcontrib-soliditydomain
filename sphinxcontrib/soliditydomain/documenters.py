@@ -1,11 +1,20 @@
-from sphinx.ext.autodoc import Documenter
+from sphinx.ext.autodoc import ALL, Documenter
+from .domain import SolidityDomain
+from .sourceregistry import SolidityObject
 
 
 class SolidityObjectDocumenter(Documenter):
     domain = 'sol'
 
     def get_sourcename(self):
-        return 'foo.sol'
+        return '{}:docstring of {} {}'.format(
+            self.object.file,
+            self.object.objtype,
+            self.object.contract_name + (
+                ''
+                if self.object.name is None else
+                '.' + self.object.name
+            ))
 
     def add_directive_header(self):
         domain = getattr(self, 'domain', 'sol')
@@ -13,7 +22,7 @@ class SolidityObjectDocumenter(Documenter):
         sourcename = self.get_sourcename()
 
         self.add_line('.. {domain}:{directive}:: {signature}'.format(
-            domain=domain, directive=directive, signature='SOMETHING'
+            domain=domain, directive=directive, signature=self.object.signature
         ), sourcename)
 
         if self.options.noindex:
@@ -21,7 +30,15 @@ class SolidityObjectDocumenter(Documenter):
 
     def add_content(self, more_content):
         """Add content from source docs and user."""
-        pass
+        sourcename = self.get_sourcename()
+
+        for line in self.object.docs.splitlines():
+            self.add_line(line, sourcename)
+
+        # add additional content (e.g. from document), if present
+        if more_content:
+            for line, src in zip(more_content.data, more_content.items):
+                self.add_line(line, src[0], src[1])
 
     def document_members(self, all_members=False):
         # type: (bool) -> None
@@ -30,7 +47,25 @@ class SolidityObjectDocumenter(Documenter):
         If *all_members* is True, do all members, else those given by
         *self.options.members*.
         """
-        pass
+        want_all = all_members or self.options.members is ALL
+
+        if not want_all and not self.options.members:
+            return
+
+        expressions = [
+            SolidityObject.file == self.object.file,
+            SolidityObject.contract_name == self.object.name
+        ]
+
+        if not want_all:
+            expressions.append(SolidityObject.name.in_(self.options.members))
+
+        if self.options.exclude_members:
+            expressions.append(SolidityObject.name.not_in_(
+                self.options.exclude_members))
+
+        for member in SolidityObject.select().where(*expressions):
+            self.add_line(member.signature)
 
     def generate(self, more_content=None, all_members=False):
         # type: (Any, str, bool, bool) -> None
@@ -41,12 +76,33 @@ class SolidityObjectDocumenter(Documenter):
         If *all_members* is True, document all members.
         """
 
-        print(self.name)
-        print('...')
-        print('...')
+        (file, _, namepath) = self.name.rpartition(':')
+        (contract_name, _, fullname) = namepath.rpartition('.')
+        (name, _, paramtypes) = fullname.partition('(')
+        paramtypes = paramtypes.rstrip(')')
 
-        # TODO: find info about what is requested
-        # TODO: collect comments
+        directive = getattr(self, 'directivetype', self.objtype)
+
+        expressions = [SolidityObject.objtype == directive]
+        if file:
+            expressions.append(SolidityObject.file == file)
+        if contract_name:
+            expressions.append(SolidityObject.contract_name == contract_name)
+        if name:
+            expressions.append(SolidityObject.name == name)
+        if paramtypes:
+            expressions.append(SolidityObject.paramtypes == paramtypes)
+
+        query = SolidityObject.select().where(*expressions)
+        sol_objects = tuple(query)
+        if len(sol_objects) == 0:
+            raise ValueError('{} {} could not be found'.format(
+                directive, self.name))
+        elif len(sol_objects) > 1:
+            raise ValueError('multiple candidates for {} {} found: {}'.format(
+                directive, self.name, sol_objects))
+
+        self.object = sol_objects[0]
 
         sourcename = self.get_sourcename()
 
@@ -70,10 +126,6 @@ class SolidityObjectDocumenter(Documenter):
         self.document_members(all_members)
 
 
-class ContractDocumenter(SolidityObjectDocumenter):
-    objtype = 'contract'
-
-
 def method_stub(self):
     raise NotImplementedError
 
@@ -83,6 +135,16 @@ for method_name in (
     'format_args', 'format_name', 'format_signature', 'get_doc', 'process_doc',
     'get_object_members', 'filter_members',
 ):
-    setattr(ContractDocumenter, method_name, method_stub)
+    setattr(SolidityObjectDocumenter, method_name, method_stub)
 
-all_solidity_documenters = (ContractDocumenter,)
+
+all_solidity_documenters = tuple(
+    type(
+        objtype.capitalize() + 'Documenter',
+        (SolidityObjectDocumenter,),
+        {
+            'objtype': 'sol' + objtype,
+            'directivetype': objtype,
+        }
+    ) for objtype in SolidityDomain.directives.keys()
+)

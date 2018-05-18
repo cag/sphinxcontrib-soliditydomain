@@ -1,4 +1,7 @@
 Autodoc Tests
 =============
 
-.. autocontract:: Kombucha
+.. autosolcontract:: WTFStarWar
+   :members:
+
+.. autosolfunction:: Kombucha.drink

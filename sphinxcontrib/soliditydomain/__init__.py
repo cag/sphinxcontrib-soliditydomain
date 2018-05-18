@@ -2,7 +2,7 @@ import os
 
 from .domain import SolidityDomain
 from .documenters import all_solidity_documenters
-from .sourceregistry import build_source_registry
+from .sourceregistry import build_source_registry, teardown_source_registry
 
 
 def setup(app):
@@ -13,6 +13,7 @@ def setup(app):
 
     app.connect('builder-inited', build_source_registry)
     app.connect('env-before-read-docs', read_all_docs)
+    app.connect('build-finished', teardown_source_registry)
 
     for documenter in all_solidity_documenters:
         app.add_autodocumenter(documenter)

@@ -1,5 +1,6 @@
 import os
 import posixpath
+import re
 from itertools import takewhile
 from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
 from antlr4.tree.Tree import TerminalNodeImpl
@@ -15,11 +16,11 @@ class SolidityObject(Model):
     objtype = CharField()
     file = CharField()
     signature = CharField()
-    name = CharField()
-    vartype = CharField()
-    paramtypes = CharField()
+    name = CharField(null=True)
+    vartype = CharField(null=True)
+    paramtypes = CharField(null=True)
     contract_name = CharField()
-    docs = TextField()
+    docs = TextField(default='')
 
     class Meta:
         database = db
@@ -48,6 +49,45 @@ def build_source_registry(app):
                     './'))
 
 
+def teardown_source_registry(app, exception):
+    # for obj in (
+    #     SolidityObject.select()
+    #     .where(SolidityObject.objtype.in_(('contract', 'interface')))
+    # ):
+    #     print(
+    #         obj.file,
+    #         obj.objtype,
+    #         obj.signature,
+    #         obj.name,
+    #         obj.vartype,
+    #         obj.paramtypes,
+    #         obj.contract_name,
+    #     )
+    #     print(obj.docs)
+    #     print()
+    db.close()
+
+
+comment_line_re = re.compile(
+    r'''
+        ^ (?: /{3,} | /\*{2,} | is )
+    ''', re.VERBOSE)
+
+
+def get_docs_from_comments_for_obj(ctx):
+    lines = []
+
+    for comment in ctx.parser._input.getHiddenTokensToLeft(
+        ctx.start.tokenIndex
+    ) or ():
+        if comment.text.startswith('///'):
+            lines.append(comment.text[3:].strip())
+        elif comment.text.startswith('/**'):
+            for rawline in comment.text[3:-2].splitlines():
+                lines.append(rawline.strip().lstrip('*').lstrip())
+
+    return '\n'.join(lines)
+
 def format_ctx_list(ctx_list):
     if ctx_list is None:
         return ''
@@ -59,91 +99,43 @@ def format_ctx_list(ctx_list):
         for pctx in ctx_list) + ')'
 
 
-def construct_signature_for_function_like(ctx):
-    param_list = format_ctx_list(
-        ctx.parameterList().parameter()
-
-        if hasattr(ctx, 'parameterList')
-        and ctx.parameterList() is not None else
-
-
-        ctx.eventParameterList().eventParameter()
-
-        if hasattr(ctx, 'eventParameterList') else
-
-        None
-    )
-    return ' '.join((
-        '{} {}{}'.format(
-            ctx.start.text,
-            ctx.identifier().getText(),
-            param_list,
-        )
-        if hasattr(ctx, 'identifier')
-        and ctx.identifier() is not None
-        else
-        '{}{}'.format(
-            ctx.start.text,
-            param_list,
-        ),
-        *(
-            ('{}{}'.format(
-                child.identifier().getText(),
-                format_ctx_list(child.expressionList().expression()),
-            ) if isinstance(
-                child,
-                SolidityParser.ModifierInvocationContext,
-            ) and child.expressionList() is not None else
-                child.getText()
-                for child in ctx.modifierList().getChildren())
-            if hasattr(ctx, 'modifierList') else
-            ()
-        ),
-        *(
-            (ctx.AnonymousKeyword().getText(),)
-            if hasattr(ctx, 'AnonymousKeyword')
-            and ctx.AnonymousKeyword() is not None else
-            ()
-        ),
-        *(
-            ('{} {}'.format(
-                ctx.returnParameters().start.text, format_ctx_list(
-                    ctx.returnParameters().parameterList().parameter())),)
-            if hasattr(ctx, 'returnParameters')
-            and ctx.returnParameters() is not None
-            else
-            ()
-        ),
-    ))
-
 
 class DefinitionsRecorder(SolidityListener):
     def __init__(self, source_unit_name):
-        self.current_contract_ctx = None
+        self.current_contract_name = None
         self.source_unit_name = source_unit_name
 
     def enterContractDefinition(self, ctx):
-        if self.current_contract_ctx is not None:
-            raise RuntimeError('trying to enter {} while already in {}'.format(
-                ctx.identifier().getText(),
-                self.current_contract_ctx.identifier().getText()))
+        name = ctx.identifier().getText()
 
-        # print(*(ctx.parser._input.getHiddenTokensToLeft(ctx.start.tokenIndex) or ()))
+        if self.current_contract_name is not None:
+            raise RuntimeError('trying to enter {} while already in {}'.format(
+                name,
+                self.current_contract_name))
+
+        objtype = ctx.start.text
+
         signature = ' '.join((
-            ctx.start.text,
-            ctx.identifier().getText(),
+            name,
             *(ctx.inheritanceSpecifier() and
                 ('is', ', '.join(
                     node.getText()
                     for node in ctx.inheritanceSpecifier())))
         ))
 
-        self.current_contract_ctx = ctx
+        self.current_contract_name = name
 
-        # print(signature)
+        SolidityObject.create(
+            objtype=objtype,
+            file=self.source_unit_name,
+            signature=signature,
+            name=name,
+            contract_name=name,
+            docs=get_docs_from_comments_for_obj(ctx),
+        )
 
     def exitContractDefinition(self, ctx):
-        self.current_contract_ctx = None
+        self.current_contract_name = None
 
     def enterStateVariableDeclaration(self, ctx):
         signature = ' '.join(
@@ -153,25 +145,86 @@ class DefinitionsRecorder(SolidityListener):
             )
         )
 
-        # print('   ', signature)
+        SolidityObject.create(
+            objtype='statevar',
+            file=self.source_unit_name,
+            signature=signature,
+            name=ctx.identifier().getText(),
+            vartype=ctx.typeName().getText(),
+            contract_name=self.current_contract_name,
+            docs=get_docs_from_comments_for_obj(ctx),
+        )
 
-    def enterConstructorDefinition(self, ctx):
-        signature = construct_signature_for_function_like(ctx)
-        # print('   ', signature)
+    def add_function_like_to_db(self, ctx):
+        name = (ctx.identifier().getText()
+                if hasattr(ctx, 'identifier')
+                and ctx.identifier() is not None else None)
 
-    def enterFunctionDefinition(self, ctx):
-        signature = construct_signature_for_function_like(ctx)
-        # print('   ', signature)
+        paramtypes = None
 
-    def enterModifierDefinition(self, ctx):
-        signature = construct_signature_for_function_like(ctx)
-        # print('   ', signature)
+        param_list = format_ctx_list(
+            ctx.parameterList().parameter()
 
-    def enterEventDefinition(self, ctx):
-        signature = construct_signature_for_function_like(ctx)
-        # print('   ', signature)
+            if hasattr(ctx, 'parameterList')
+            and ctx.parameterList() is not None else
+
+            ctx.eventParameterList().eventParameter()
+
+            if hasattr(ctx, 'eventParameterList') else
+
+            None
+        )
+
+        signature = ' '.join((
+            ('' if name is None else name) + param_list,
+            *(
+                ('{}{}'.format(
+                    child.identifier().getText(),
+                    format_ctx_list(child.expressionList().expression()),
+                ) if isinstance(
+                    child,
+                    SolidityParser.ModifierInvocationContext,
+                ) and child.expressionList() is not None else
+                    child.getText()
+                    for child in ctx.modifierList().getChildren())
+                if hasattr(ctx, 'modifierList') else
+                ()
+            ),
+            *(
+                (ctx.AnonymousKeyword().getText(),)
+                if hasattr(ctx, 'AnonymousKeyword')
+                and ctx.AnonymousKeyword() is not None else
+                ()
+            ),
+            *(
+                ('{} {}'.format(
+                    ctx.returnParameters().start.text, format_ctx_list(
+                        ctx.returnParameters().parameterList().parameter())),)
+                if hasattr(ctx, 'returnParameters')
+                and ctx.returnParameters() is not None
+                else
+                ()
+            ),
+        ))
+
+        SolidityObject.create(
+            objtype=ctx.start.text,
+            file=self.source_unit_name,
+            signature=signature,
+            name=name,
+            paramtypes=paramtypes,
+            contract_name=self.current_contract_name,
+            docs=get_docs_from_comments_for_obj(ctx),
+        )
+
+    enterConstructorDefinition = add_function_like_to_db
+    enterFunctionDefinition = add_function_like_to_db
+    enterModifierDefinition = add_function_like_to_db
+    enterEventDefinition = add_function_like_to_db
 
     def enterStructDefinition(self, ctx):
+        docs = get_docs_from_comments_for_obj(ctx)
+
         signature = ' '.join((
             ctx.start.text,
             ctx.identifier().getText(),
@@ -185,11 +238,9 @@ class DefinitionsRecorder(SolidityListener):
             for vdctx in ctx.variableDeclaration()
         )
 
-        # print('   ', signature)
-        # for member in members:
-        #     print('       ', member)
-
     def enterEnumDefinition(self, ctx):
+        docs = get_docs_from_comments_for_obj(ctx)
+
         signature = ' '.join((
             ctx.start.text,
             ctx.identifier().getText(),
@@ -199,10 +250,6 @@ class DefinitionsRecorder(SolidityListener):
             enum_val.getText()
             for enum_val in ctx.enumValue()
         )
-
-        # print('   ', signature)
-        # for member in members:
-        #     print('       ', member)
 
 
 def parse_sol(srcpath, relsrcpath):
