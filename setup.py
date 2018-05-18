@@ -9,7 +9,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='sphinxcontrib-soliditydomain',
-    version='0.2.0',
+    version='0.3.0',
     description='Solidity domain for Sphinx',
 
     long_description=long_description,
@@ -37,4 +37,13 @@ setup(
     keywords='sphinx solidity domain contrib documentation generator plugin',
 
     packages=['sphinxcontrib.soliditydomain'],
+
+    install_requires=[
+        'antlr4-python3-runtime',
+        'peewee',
+    ],
+
+    package_data={
+        'sphinxcontrib.soliditydomain': ['Solidity.g4'],
+    },
 )
