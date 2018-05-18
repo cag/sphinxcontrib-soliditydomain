@@ -1,7 +1,7 @@
 Autodoc Tests
 =============
 
-.. autosolcontract:: DutchExchange
+.. autosollibrary:: Math
    :members:
    :undoc-members:
 

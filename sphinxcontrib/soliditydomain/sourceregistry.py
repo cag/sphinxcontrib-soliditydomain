@@ -17,7 +17,6 @@ class SolidityObject(Model):
     file = CharField()
     signature = CharField()
     name = CharField(null=True)
-    vartype = CharField(null=True)
     paramtypes = CharField(null=True)
     contract_name = CharField(null=True)
     docs = TextField(default='')
@@ -50,21 +49,20 @@ def build_source_registry(app):
 
 
 def teardown_source_registry(app, exception):
-    # for obj in (
-    #     SolidityObject.select()
-    #     .where(SolidityObject.objtype.in_(('contract', 'interface')))
-    # ):
-    #     print(
-    #         obj.file,
-    #         obj.objtype,
-    #         obj.signature,
-    #         obj.name,
-    #         obj.vartype,
-    #         obj.paramtypes,
-    #         obj.contract_name,
-    #     )
-    #     print(obj.docs)
-    #     print()
+    for obj in (
+        SolidityObject.select()
+        .where(SolidityObject.objtype.in_(('event',)))
+    ):
+        print(
+            obj.file,
+            obj.objtype,
+            # obj.signature,
+            obj.contract_name,
+            obj.name,
+            obj.paramtypes,
+        )
+        # print(obj.docs)
+        # print()
     db.close()
 
 
@@ -150,7 +148,6 @@ class DefinitionsRecorder(SolidityListener):
             file=self.source_unit_name,
             signature=signature,
             name=ctx.identifier().getText(),
-            vartype=ctx.typeName().getText(),
             contract_name=self.current_contract_name,
             docs=get_docs_from_comments_for_obj(ctx),
         )
@@ -160,23 +157,22 @@ class DefinitionsRecorder(SolidityListener):
                 if hasattr(ctx, 'identifier')
                 and ctx.identifier() is not None else None)
 
-        paramtypes = None
+        if hasattr(ctx, 'parameterList') and ctx.parameterList() is not None:
+            params = ctx.parameterList().parameter()
+        elif hasattr(ctx, 'eventParameterList'):
+            params = ctx.eventParameterList().eventParameter()
+        else:
+            params = None
 
-        param_list = format_ctx_list(
-            ctx.parameterList().parameter()
+        if params is None:
+            paramtypes = None
+        else:
+            paramtypes = ','.join(param.typeName().getText() for param in params)
 
-            if hasattr(ctx, 'parameterList')
-            and ctx.parameterList() is not None else
-
-            ctx.eventParameterList().eventParameter()
-
-            if hasattr(ctx, 'eventParameterList') else
-
-            None
-        )
+        params_str = format_ctx_list(params)
 
         signature = ' '.join((
-            ('' if name is None else name) + param_list,
+            ('' if name is None else name) + params_str,
             *(
                 ('{}{}'.format(
                     child.identifier().getText(),

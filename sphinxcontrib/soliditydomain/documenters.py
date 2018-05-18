@@ -1,3 +1,4 @@
+import re
 from sphinx.ext.autodoc import (
     ALL, Documenter,
     bool_option, members_option, members_set_option)
@@ -75,10 +76,14 @@ class SolidityObjectDocumenter(Documenter):
 
         for member in SolidityObject.select().where(*expressions):
             self.add_line('', sourcename)
-            full_mname = '{}:{}{}'.format(
-                member.file,
-                '' if member.contract_name is None else member.contract_name + '.',
-                member.name or '')
+            full_mname = '{file}:{contract}{name}{paramtypes}'.format(
+                file=member.file,
+                contract='' if member.contract_name is None
+                else member.contract_name + '.',
+                name=member.name or '',
+                paramtypes='' if member.paramtypes is None
+                else '(' + member.paramtypes + ')',
+            )
             documenter = all_solidity_documenters[member.objtype](
                 self.directive, full_mname, self.indent)
             documenter.generate(all_members=True)
@@ -91,35 +96,52 @@ class SolidityObjectDocumenter(Documenter):
         If *more_content* is given, include that content.
         If *all_members* is True, document all members.
         """
+        directive = getattr(self, 'directivetype', self.objtype)
 
+        # parse components out of name
         (file, _, namepath) = self.name.rpartition(':')
         (contract_name, _, fullname) = namepath.rpartition('.')
         (name, _, paramtypes) = fullname.partition('(')
-        paramtypes = paramtypes.rstrip(')')
 
-        directive = getattr(self, 'directivetype', self.objtype)
+        # normalize components
+        name = name.strip() or None
 
-        expressions = [SolidityObject.objtype == directive]
+        paramtypes = ','.join(ptype.strip() for ptype in paramtypes.split(','))
+        paramtypes = re.sub(r'\s+', ' ', paramtypes)
+        if paramtypes.endswith(')'):
+            paramtypes = paramtypes[:-1]
+
+        # build query
+        expressions = [
+            SolidityObject.objtype == directive,
+            SolidityObject.name == name,
+        ]
+
         if file:
             expressions.append(SolidityObject.file == file)
         if contract_name:
             expressions.append(SolidityObject.contract_name == contract_name)
-        if name:
-            expressions.append(SolidityObject.name == name)
         if paramtypes:
             expressions.append(SolidityObject.paramtypes == paramtypes)
 
+        # get associated object
         query = SolidityObject.select().where(*expressions)
         sol_objects = tuple(query)
         if len(sol_objects) == 0:
-            raise ValueError('{} {} could not be found'.format(
-                directive, self.name))
+            raise ValueError('{} {} could not be found via query:\n{}'.format(
+                directive, self.name, ',\n'.join(
+                    '  ' + str(expr.lhs.column_name) +
+                    str(expr.op) + expr.rhs
+                    for expr in expressions
+                )))
         elif len(sol_objects) > 1:
-            raise ValueError('multiple candidates for {} {} found: {}'.format(
-                directive, self.name, sol_objects))
+            raise ValueError('multiple candidates for {} {} found:\n{}'.format(
+                directive, self.name,
+                '\n'.join('  ' + obj.signature for obj in sol_objects)))
 
         self.object = sol_objects[0]
 
+        # begin rendering output
         sourcename = self.get_sourcename()
 
         # make sure that the result starts with an empty line.  This is
@@ -139,7 +161,8 @@ class SolidityObjectDocumenter(Documenter):
         self.add_content(more_content)
 
         # document members, if possible
-        self.document_members(all_members)
+        if directive in ('contract', 'interface', 'library'):
+            self.document_members(all_members)
 
 
 def method_stub(self):
