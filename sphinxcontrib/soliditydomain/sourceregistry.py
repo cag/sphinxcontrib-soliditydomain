@@ -19,7 +19,7 @@ class SolidityObject(Model):
     name = CharField(null=True)
     vartype = CharField(null=True)
     paramtypes = CharField(null=True)
-    contract_name = CharField()
+    contract_name = CharField(null=True)
     docs = TextField(default='')
 
     class Meta:
@@ -130,7 +130,7 @@ class DefinitionsRecorder(SolidityListener):
             file=self.source_unit_name,
             signature=signature,
             name=name,
-            contract_name=name,
+            contract_name=None,
             docs=get_docs_from_comments_for_obj(ctx),
         )
 

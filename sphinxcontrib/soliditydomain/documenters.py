@@ -1,20 +1,27 @@
-from sphinx.ext.autodoc import ALL, Documenter
+from sphinx.ext.autodoc import (
+    ALL, Documenter,
+    bool_option, members_option, members_set_option)
 from .domain import SolidityDomain
 from .sourceregistry import SolidityObject
 
 
 class SolidityObjectDocumenter(Documenter):
     domain = 'sol'
+    option_spec = {
+        'members': members_option,
+        'undoc-members': bool_option,
+        'noindex': bool_option,
+        'exclude-members': members_set_option,
+    }
 
     def get_sourcename(self):
         return '{}:docstring of {} {}'.format(
             self.object.file,
             self.object.objtype,
-            self.object.contract_name + (
-                ''
-                if self.object.name is None else
-                '.' + self.object.name
-            ))
+            '.'.join(filter(lambda x: x,
+                            (self.object.contract_name,
+                             self.object.name))),
+        )
 
     def add_directive_header(self):
         domain = getattr(self, 'domain', 'sol')
@@ -47,6 +54,8 @@ class SolidityObjectDocumenter(Documenter):
         If *all_members* is True, do all members, else those given by
         *self.options.members*.
         """
+        sourcename = self.get_sourcename()
+
         want_all = all_members or self.options.members is ALL
 
         if not want_all and not self.options.members:
@@ -65,7 +74,14 @@ class SolidityObjectDocumenter(Documenter):
                 self.options.exclude_members))
 
         for member in SolidityObject.select().where(*expressions):
-            self.add_line(member.signature)
+            self.add_line('', sourcename)
+            full_mname = '{}:{}{}'.format(
+                member.file,
+                '' if member.contract_name is None else member.contract_name + '.',
+                member.name or '')
+            documenter = all_solidity_documenters[member.objtype](
+                self.directive, full_mname, self.indent)
+            documenter.generate(all_members=True)
 
     def generate(self, more_content=None, all_members=False):
         # type: (Any, str, bool, bool) -> None
@@ -138,13 +154,13 @@ for method_name in (
     setattr(SolidityObjectDocumenter, method_name, method_stub)
 
 
-all_solidity_documenters = tuple(
-    type(
+all_solidity_documenters = dict(
+    (objtype, type(
         objtype.capitalize() + 'Documenter',
         (SolidityObjectDocumenter,),
         {
             'objtype': 'sol' + objtype,
             'directivetype': objtype,
         }
-    ) for objtype in SolidityDomain.directives.keys()
+    )) for objtype in SolidityDomain.directives.keys()
 )

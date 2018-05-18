@@ -15,7 +15,7 @@ def setup(app):
     app.connect('env-before-read-docs', read_all_docs)
     app.connect('build-finished', teardown_source_registry)
 
-    for documenter in all_solidity_documenters:
+    for documenter in all_solidity_documenters.values():
         app.add_autodocumenter(documenter)
 
 
