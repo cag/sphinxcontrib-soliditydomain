@@ -142,7 +142,7 @@ functionTypeName
     ( 'returns' functionTypeParameterList )? ;
 
 storageLocation
-  : 'memory' | 'storage' ;
+  : 'memory' | 'storage' | 'calldata';
 
 stateMutability
   : PureKeyword | ConstantKeyword | ViewKeyword | PayableKeyword ;
@@ -201,7 +201,10 @@ emitStatement
   : 'emit' functionCall ';' ;
 
 variableDeclarationStatement
-  : ( 'var' identifierList | variableDeclaration ) ( '=' expression )? ';';
+  : ( 'var' identifierList | variableDeclaration | '(' variableDeclarationList ')' ) ( '=' expression )? ';';
+
+variableDeclarationList
+  : variableDeclaration? (',' variableDeclaration? )* ;
 
 identifierList
   : '(' ( identifier? ',' )* identifier? ')' ;
@@ -369,7 +372,7 @@ BooleanLiteral
   : 'true' | 'false' ;
 
 DecimalNumber
-  : [0-9]+ ( '.' [0-9]* )? ( [eE] [0-9]+ )? ;
+  : ([0-9]+ | ([0-9]* '.' [0-9]+) ) ( [eE] [0-9]+ )? ;
 
 HexNumber
   : '0x' HexCharacter+ ;

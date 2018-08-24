@@ -476,6 +476,15 @@ class SolidityListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by SolidityParser#variableDeclarationList.
+    def enterVariableDeclarationList(self, ctx:SolidityParser.VariableDeclarationListContext):
+        pass
+
+    # Exit a parse tree produced by SolidityParser#variableDeclarationList.
+    def exitVariableDeclarationList(self, ctx:SolidityParser.VariableDeclarationListContext):
+        pass
+
+
     # Enter a parse tree produced by SolidityParser#identifierList.
     def enterIdentifierList(self, ctx:SolidityParser.IdentifierListContext):
         pass
