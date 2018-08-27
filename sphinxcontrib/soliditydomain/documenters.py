@@ -103,11 +103,15 @@ class SolidityObjectDocumenter(Documenter):
 
         # parse components out of name
         (file, _, namepath) = self.name.rpartition(':')
-        (contract_name, _, fullname) = namepath.rpartition('.')
+        (contract_name, _, fullname) = namepath.partition('.')
         (name, _, paramtypes) = fullname.partition('(')
 
         # normalize components
         name = name.strip() or None
+
+        if name is None:
+            name = contract_name
+            contract_name = None
 
         paramtypes = ','.join(ptype.strip() for ptype in paramtypes.split(','))
         paramtypes = re.sub(r'\s+', ' ', paramtypes)
@@ -131,6 +135,7 @@ class SolidityObjectDocumenter(Documenter):
         query = SolidityObject.select().where(*expressions)
         sol_objects = tuple(query)
         if len(sol_objects) == 0:
+            print([(str(expr.lhs.column_name), expr.rhs) for expr in expressions])
             raise ValueError('{} {} could not be found via query:\n{}'.format(
                 directive, self.name, ',\n'.join(
                     '  ' + str(expr.lhs.column_name) +
