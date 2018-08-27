@@ -4,6 +4,8 @@ from .domain import SolidityDomain
 from .documenters import all_solidity_documenters
 from .sourceregistry import build_source_registry, teardown_source_registry
 
+with open(os.path.join(os.path.dirname(__file__), 'VERSION')) as version_file:
+    __version__ = version_file.read().strip()
 
 def setup(app):
     app.add_config_value('autodoc_lookup_path',

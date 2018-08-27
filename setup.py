@@ -7,9 +7,12 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+with open(path.join(here, 'sphinxcontrib', 'soliditydomain', 'VERSION')) as version_file:
+    version = version_file.read().strip()
+
 setup(
     name='sphinxcontrib-soliditydomain',
-    version='0.3.2',
+    version=version,
     description='Solidity domain for Sphinx',
 
     long_description=long_description,
@@ -44,6 +47,6 @@ setup(
     ],
 
     package_data={
-        'sphinxcontrib.soliditydomain': ['Solidity.g4'],
+        'sphinxcontrib.soliditydomain': ['VERSION', 'Solidity.g4'],
     },
 )
