@@ -42,7 +42,8 @@ version = major + '.' + minor
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinxcontrib.soliditydomain'
+    'sphinx.ext.autodoc',
+    'sphinxcontrib.soliditydomain',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -157,3 +158,13 @@ texinfo_documents = [
      author, 'SolidityDomainforSphinx', 'One line description of project.',
      'Miscellaneous'),
 ]
+
+# -- Options for Solidity domain ---------------------------------------------
+
+autodoc_lookup_path = '.'
+
+# -- Add Solidity lexer
+
+from sphinx.highlighting import lexers
+from pygments_lexer_solidity import SolidityLexer
+lexers['solidity'] = SolidityLexer()

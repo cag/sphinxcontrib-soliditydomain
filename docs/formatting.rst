@@ -1,8 +1,5 @@
-Domain User Guide
-=================
-
 Formatting Solidity Elements
-----------------------------
+============================
 
 .. rst:directive::
     .. sol:contract:: Name is Parent1, Parent2, ...
@@ -144,4 +141,3 @@ Formatting Solidity Elements
         .. sol:event:: Refunded(address indexed beneficiary, uint256 weiAmount)
 
             Emitted when ``weiAmount`` gets refunded to a ``beneficiary``.
-
