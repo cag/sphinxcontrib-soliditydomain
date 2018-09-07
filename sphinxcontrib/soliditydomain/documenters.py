@@ -74,7 +74,7 @@ class SolidityObjectDocumenter(Documenter):
             expressions.append(SolidityObject.name.in_(self.options.members))
 
         if self.options.exclude_members:
-            expressions.append(SolidityObject.name.not_in_(
+            expressions.append(SolidityObject.name.not_in(
                 self.options.exclude_members))
 
         for member in SolidityObject.select().where(*expressions):
