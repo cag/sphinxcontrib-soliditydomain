@@ -71,11 +71,47 @@ class SolidityObjectDocumenter(Documenter):
         ]
 
         if not want_all:
-            expressions.append(SolidityObject.name.in_(self.options.members))
+            members_inset = set()
+            should_include_fallback = False
+            should_include_constructor = False
+
+            for member in self.options.members:
+                if member == '<fallback>':
+                    should_include_fallback = True
+                elif member == 'constructor':
+                    should_include_constructor = True
+                elif member:
+                    members_inset.add(member)
+
+            expr = SolidityObject.name.in_(members_inset)
+            if should_include_fallback:
+                expr |= (SolidityObject.objtype == 'function') & (SolidityObject.name.is_null(True))
+            if should_include_constructor:
+                expr |= (SolidityObject.objtype == 'constructor') & (SolidityObject.name.is_null(True))
+
+            expressions.append(expr)
 
         if self.options.exclude_members:
-            expressions.append(SolidityObject.name.not_in_(
-                self.options.exclude_members))
+            should_exclude_fallback = False
+            should_exclude_constructor = False
+
+            if '<fallback>' in self.options.exclude_members:
+                self.options.exclude_members.remove('<fallback>')
+                should_exclude_fallback = True
+            if 'constructor' in self.options.exclude_members:
+                self.options.exclude_members.remove('constructor')
+                should_exclude_constructor = True
+
+            expr = SolidityObject.name.not_in(self.options.exclude_members)
+
+            subexpr = SolidityObject.name.is_null(True)
+            if should_exclude_fallback:
+                subexpr &= (SolidityObject.objtype != 'function')
+            if should_exclude_constructor:
+                subexpr &= (SolidityObject.objtype != 'constructor')
+            expr |= subexpr
+
+            expressions.append(expr)
 
         for member in SolidityObject.select().where(*expressions):
             self.add_line('', sourcename)
@@ -109,7 +145,7 @@ class SolidityObjectDocumenter(Documenter):
         # normalize components
         name = name.strip() or None
 
-        if name is None:
+        if directive in ('contract', 'interface', 'library') and name is None:
             name = contract_name
             contract_name = None
 

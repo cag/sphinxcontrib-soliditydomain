@@ -1,8 +1,5 @@
-Domain User Guide
-=================
-
 Formatting Solidity Elements
-----------------------------
+============================
 
 .. rst:directive::
     .. sol:contract:: Name is Parent1, Parent2, ...
@@ -145,3 +142,52 @@ Formatting Solidity Elements
 
             Emitted when ``weiAmount`` gets refunded to a ``beneficiary``.
 
+.. rst:directive:: .. sol:struct:: Name
+
+    Solidity structs. Members of the struct are represented by a ``member`` field. For example:
+
+    .. code-block:: rst
+
+        .. sol:struct:: DreamMachine
+
+            Some archetypical madness.
+
+            :member uint widget: Funky lil' widget.
+            :member FunkUtils.Orientation orientation: Which way the machine is pointing.
+            :member typelessThing: Type information is optional.
+
+    yields
+
+    .. sol:struct:: DreamMachine
+
+        Some archetypical madness.
+
+        :member uint widget: Funky lil' widget.
+        :member FunkUtils.Orientation orientation: Which way the machine is pointing.
+        :member typelessThing: Type information is optional.
+
+.. rst:directive:: .. sol:enum:: Name
+
+    Solidity enum definitions. Like :rst:dir:`struct`, members are represented by a ``member`` field, but for enums, this field is typeless. For example:
+
+    .. code-block:: rst
+
+        .. sol:enum:: Direction
+
+            Which way to go.
+
+            :member North: Where Santa's at.
+            :member South: Where penguins're at.
+            :member East: Get tricky.
+            :member West: Get funky.
+
+    yields
+
+    .. sol:enum:: Direction
+
+        Which way to go.
+
+        :member North: Where Santa's at.
+        :member South: Where penguins're at.
+        :member East: Get tricky.
+        :member West: Get funky.

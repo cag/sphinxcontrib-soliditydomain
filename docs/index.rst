@@ -6,7 +6,8 @@ Solidity Domain for Sphinx
    :caption: Contents:
 
    installation
-   domain
+   formatting
+   autodoc
 
 Indices and tables
 ==================

@@ -99,7 +99,7 @@ class SolidityTypeLike(SolidityObject):
 
 
 param_var_re = re.compile(
-    r'''\s* ( [\w\s\[\]\(\)=>]+? ) # type
+    r'''\s* ( [\w\s\[\]\(\)=>\.]+? ) # type
         (?: \s* \b (
             public | private | internal |
             storage | memory |
@@ -183,7 +183,7 @@ modifier_re = re.compile(r'(\w+)(?:\s*\(([^)]*)\))?')
 class SolidityFunctionLike(SolidityObject):
     doc_field_types = [
         TypedField('parameter', label=_('Parameters'),
-                   names=('param', 'parameter', 'param', 'paramument'),
+                   names=('param', 'parameter', 'arg', 'argument'),
                    typenames=('type',)),
         TypedField('returnvalue', label=_('Returns'),
                    names=('return', 'returns'),
