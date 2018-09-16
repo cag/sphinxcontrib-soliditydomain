@@ -109,7 +109,7 @@ class SolidityObjectDocumenter(Documenter):
         # normalize components
         name = name.strip() or None
 
-        if name is None:
+        if directive in ('contract', 'interface', 'library') and name is None:
             name = contract_name
             contract_name = None
 
