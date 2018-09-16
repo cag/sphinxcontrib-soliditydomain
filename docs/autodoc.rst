@@ -33,9 +33,12 @@ Let's suppose that the following code is found in a Solidity source file:
 
 The following directives may be used:
 
-.. rst:directive:: .. autosolcontract:: Name
+.. rst:directive::
+    .. autosolcontract:: Name
+    .. autosollibrary:: Name
+    .. autosolinterface:: Name
 
-    This directive requires a contract name, and will render to a corresponding :rst:dir:`sol:contract` block. The following ReST:
+    This directive requires the targetted object's name, and will render to a corresponding :rst:dir:`sol:contract`, :rst:dir:`sol:library`, or :rst:dir:`sol:interface` block. The following ReST:
 
     .. code-block:: rst
 
@@ -66,13 +69,17 @@ The following directives may be used:
         .. autosolcontract:: BugBunny
             :noindex:
             :members:
-            :exclude-members: ballerz, Consumption, eat, AnonEvent, doesEat, <fallback>
+            :exclude-members: ballerz, Consumption, eat, doesEat, <fallback>
 
     yielding
 
     .. autosolcontract:: BugBunny
         :noindex:
         :members:
-        :exclude-members: ballerz, Consumption, eat, AnonEvent, doesEat, <fallback>
+        :exclude-members: ballerz, Consumption, eat, doesEat, <fallback>
 
     .. note:: Contract members will appear in the order they were indexed by the Solidity source crawler.
+
+.. rst:directive::
+    autosollibrary
+    autosolinterface

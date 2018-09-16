@@ -1,21 +1,36 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.24;
+
+library DaHood {
+    enum Coast { East, West }
+}
 
 /// @title A simulator for Bug Bunny, the most famous Rabbit
 /// @author Warned Bros
 contract BugBunny {
 
-    // tags on storage vars currently unsupported by devdocs
+    /// Hash of a carrot. You can use triple forward slashes (``///``)
+    /// to have Solidity Domain pull the docs out of the comment.
+    /**
+     * Comment blocks starting with ``/**`` will also be added to documentation.
+     * These blocks may be framed with a preceding ``*`` on each line.
+     */
     bytes32 public carrotHash;
     mapping (address => mapping (uint => bool)) public ballerz;
 
-    // tags on events currently unsupported by devdocs
     event Consumption(address indexed feeder, string food);
     event Consumption(address indexed payer, uint amount);
-    event AnonEvent() anonymous;
 
-    // tags on constructors currently unsupported by devdocs
+    /// Doxygen-style tags on events currently unsupported by devdocs
+    /// but will work here.
+    /// @param coast The original beef.
+    event AnonEvent(DaHood.Coast coast) anonymous;
+
+    /// Constructor for BugBunny. Note that solc doesn't parse
+    /// Doxygen-style devdocs for these, but this is supported
+    /// in this plugin.
+    /// @param carrot Eh... what's up, doc?
     constructor(string carrot) public {
-        carrotHash = keccak256(carrot);
+        carrotHash = keccak256(abi.encodePacked(carrot));
     }
 
     /// @author Birb Lampkett
@@ -24,7 +39,7 @@ contract BugBunny {
     /// @param _food The name of a food to evaluate (English)
     /// @return true if Bug will eat it, false otherwise
     function doesEat(string _food) public view returns (bool) {
-        return keccak256(_food) == carrotHash;
+        return keccak256(abi.encodePacked(_food)) == carrotHash;
     }
 
     /// @author Funk Master
@@ -36,9 +51,9 @@ contract BugBunny {
     /// }
     function eat(string _food) public returns (bool eaten, bytes32 hash) {
         eaten = doesEat(_food);
-        hash = keccak256(_food);
+        hash = keccak256(abi.encodePacked(_food));
         if(eaten) {
-            Consumption(msg.sender, _food);
+            emit Consumption(msg.sender, _food);
         }
     }
 
@@ -60,7 +75,7 @@ contract BugBunny {
 
     // tags on fallback functions currently not supported by devdocs
     function() external payable {
-        Consumption(msg.sender, msg.value);
+        emit Consumption(msg.sender, msg.value);
         ballerz[msg.sender][msg.value] = true;
     }
 }
