@@ -99,7 +99,7 @@ class SolidityTypeLike(SolidityObject):
 
 
 param_var_re = re.compile(
-    r'''\s* ( [\w\s\[\]\(\)=>]+? ) # type
+    r'''\s* ( [\w\s\[\]\(\)=>\.]+? ) # type
         (?: \s* \b (
             public | private | internal |
             storage | memory |
