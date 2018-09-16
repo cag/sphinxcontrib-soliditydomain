@@ -14,7 +14,7 @@ contract BugBunny {
     event AnonEvent() anonymous;
 
     // tags on constructors currently unsupported by devdocs
-    function BugBunny(string carrot) public {
+    constructor(string carrot) public {
         carrotHash = keccak256(carrot);
     }
 

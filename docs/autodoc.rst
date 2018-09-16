@@ -45,28 +45,34 @@ The following directives may be used:
 
     .. autosolcontract:: BugBunny
 
-    Furthermore, the ``:members:`` and ``:exclude-members:`` options may be used as expected, with
+    Furthermore, the ``:noindex:``, ``:members:`` and ``:exclude-members:`` options may be used as expected, with
 
     .. code-block:: rst
 
         .. autosolcontract:: BugBunny
-            :members: doesEat
+            :noindex:
+            :members: doesEat, constructor
 
     yielding
 
     .. autosolcontract:: BugBunny
-        :members: doesEat
+        :noindex:
+        :members: doesEat, constructor
 
     and
 
     .. code-block:: rst
 
         .. autosolcontract:: BugBunny
+            :noindex:
             :members:
-            :exclude-members: ballerz, Consumption, eat, AnonEvent, doesEat
+            :exclude-members: ballerz, Consumption, eat, AnonEvent, doesEat, <fallback>
 
     yielding
 
     .. autosolcontract:: BugBunny
+        :noindex:
         :members:
-        :exclude-members: ballerz, Consumption, eat, AnonEvent, doesEat
+        :exclude-members: ballerz, Consumption, eat, AnonEvent, doesEat, <fallback>
+
+    .. note:: Contract members will appear in the order they were indexed by the Solidity source crawler.
