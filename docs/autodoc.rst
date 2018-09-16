@@ -38,7 +38,7 @@ The following directives may be used:
     .. autosollibrary:: Name
     .. autosolinterface:: Name
 
-    This directive requires the targetted object's name, and will render to a corresponding :rst:dir:`sol:contract`, :rst:dir:`sol:library`, or :rst:dir:`sol:interface` block. The following ReST:
+    These directive require the targetted object's name and will render to a corresponding :rst:dir:`sol:contract`, :rst:dir:`sol:library`, or :rst:dir:`sol:interface` block. The following ReST:
 
     .. code-block:: rst
 
@@ -79,7 +79,3 @@ The following directives may be used:
         :exclude-members: ballerz, Consumption, eat, doesEat, <fallback>
 
     .. note:: Contract members will appear in the order they were indexed by the Solidity source crawler.
-
-.. rst:directive::
-    autosollibrary
-    autosolinterface
