@@ -19,7 +19,7 @@ This may be changed with the following configuration variable:
 
 .. note:: ``sphinxcontrib.soliditydomain`` will crawl the contract lookup directory, collecting ``.sol`` files, parsing the source content with an `ANTLR 4 <https://www.antlr.org>`_ parser using `this Solidity grammar definition <https://github.com/solidityj/solidity-antlr4>`_, and building a database of Solidity language objects for which the documentation tool will be able to automatically generate documentation.
 
-.. warning:: If a Solidity source file cannot be parsed by this package, an error will be thrown and the Sphinx build will halt.
+.. note:: If a Solidity source file cannot be parsed by this package, a warning will be issued and the Sphinx build will continue trying to build the rest of the documentation.
 
 Autodoc Directives By Example
 -----------------------------
