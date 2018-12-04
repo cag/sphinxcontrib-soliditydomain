@@ -9,6 +9,9 @@ from sphinx.roles import XRefRole
 from sphinx.util.docfields import Field, GroupedField, TypedField
 from sphinx.util.nodes import make_refnode
 
+from sphinx.util.logging import getLogger
+logger = getLogger(__name__)
+
 SolObjFullName = namedtuple(
     'SolObjFullName', ('name', 'obj_path', 'param_types'))
 
@@ -57,7 +60,9 @@ class SolidityObject(ObjectDescription):
     def before_content(self):
         if self.names:
             obj_path = self.env.ref_context.setdefault('sol:obj_path', [])
-            obj_path.append(self.names.pop().name)
+            last_name = self.names.pop()
+            if hasattr(last_name, 'name'):
+                obj_path.append(last_name.name)
 
     def after_content(self):
         obj_path = self.env.ref_context.setdefault('sol:obj_path', [])
@@ -78,7 +83,8 @@ class SolidityTypeLike(SolidityObject):
     def handle_signature(self, sig, signode):
         match = contract_re.fullmatch(sig)
         if match is None:
-            raise ValueError
+            logger.warning('could not parse {}'.format(sig))
+            return None
 
         name, parents_str = match.groups()
         parents = [] if parents_str is None else [
@@ -123,13 +129,15 @@ class SolidityStateVariable(SolidityObject):
         match = param_var_re.fullmatch(sig)
 
         if match is None:
-            raise ValueError
+            logger.warning('could not parse {}'.format(sig))
+            return None
 
         # normalize type string
         type_str, visibility, name = match.groups()
 
         if name is None:
-            raise ValueError
+            logger.warning('missing name from {}'.format(sig))
+            return None
 
         type_str = normalize_type(type_str)
 
@@ -164,7 +172,8 @@ def _parse_params(paramlist_str):
         param_str) for param_str in paramlist_str.split(',')]
 
     if not all(parammatches):
-        raise ValueError
+        logger.warning('could not parse all params in parameter list {}'.format(paramlist_str))
+        return None
 
     abi_types = []
     for parammatch in parammatches:
@@ -195,7 +204,8 @@ class SolidityFunctionLike(SolidityObject):
         primary_line = addnodes.desc_signature_line(add_permalink=True)
         match = function_re.fullmatch(sig)
         if match is None:
-            raise ValueError
+            logger.warning('could not parse {}'.format(sig))
+            return None
 
         name, paramlist_str, modifiers_str = match.groups()
 
@@ -208,9 +218,11 @@ class SolidityFunctionLike(SolidityObject):
                 primary_line += addnodes.desc_name(text=_('<fallback>'))
                 primary_line += nodes.emphasis(text=' ' + self.objtype)
                 if len(paramlist_str.strip()) != 0:
-                    raise ValueError
+                    logger.warning('fallback function must have no parameters, but instead got parameter list {}'.format(paramlist_str))
+                    return None
             else:
-                raise ValueError
+                logger.warning('{} must have name'.format(self.objtype))
+                return None
         else:
             primary_line += nodes.emphasis(text=self.objtype + ' ')
             primary_line += addnodes.desc_name(text=name)
@@ -220,7 +232,8 @@ class SolidityFunctionLike(SolidityObject):
         signode += primary_line
 
         if self.objtype == 'modifier' and len(modifiers_str.strip()) != 0:
-            raise ValueError
+            logger.warning("modifier {} can't have modifiers".format(name))
+            return None
 
         for match in modifier_re.finditer(modifiers_str):
             modname, modparams_str = match.groups()
@@ -234,7 +247,8 @@ class SolidityFunctionLike(SolidityObject):
             ):
                 newline += nodes.emphasis(text=modname)
                 if modparams_str is not None:
-                    raise ValueError
+                    logger.warning("keyword {} can't have arguments".format(modname))
+                    return None
             elif modname == 'returns':
                 newline += nodes.emphasis(text=modname + ' ')
                 if modparams_str is not None:

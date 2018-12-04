@@ -5,6 +5,9 @@ from sphinx.ext.autodoc import (
 from .domain import SolidityDomain
 from .sourceregistry import SolidityObject
 
+from sphinx.util.logging import getLogger
+logger = getLogger(__name__)
+
 
 class SolidityObjectDocumenter(Documenter):
     domain = 'sol'
@@ -179,15 +182,15 @@ class SolidityObjectDocumenter(Documenter):
         query = SolidityObject.select().where(*expressions)
         sol_objects = tuple(query)
         if len(sol_objects) == 0:
-            print([(str(expr.lhs.column_name), expr.rhs) for expr in expressions])
-            raise ValueError('{} {} could not be found via query:\n{}'.format(
+            logger.warning('{} {} could not be found via query:\n{}'.format(
                 directive, self.name, ',\n'.join(
                     '  ' + str(expr.lhs.column_name) +
-                    str(expr.op) + expr.rhs
+                    str(expr.op) + ('' if expr.rhs is None else expr.rhs)
                     for expr in expressions
                 )))
+            return
         elif len(sol_objects) > 1:
-            raise ValueError('multiple candidates for {} {} found:\n{}'.format(
+            logger.warning('multiple candidates for {} {} found:\n{}'.format(
                 directive, self.name,
                 '\n'.join('  ' + obj.signature for obj in sol_objects)))
 

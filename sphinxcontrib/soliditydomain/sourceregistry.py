@@ -3,6 +3,7 @@ import os
 import posixpath
 import re
 from collections import OrderedDict
+from functools import wraps
 from itertools import takewhile
 from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
 from antlr4.tree.Tree import TerminalNodeImpl
@@ -10,6 +11,9 @@ from peewee import Model, CharField, TextField, SqliteDatabase
 from .SolidityLexer import SolidityLexer
 from .SolidityParser import SolidityParser
 from .SolidityListener import SolidityListener
+
+from sphinx.util.logging import getLogger
+logger = getLogger(__name__)
 
 db = SqliteDatabase(':memory:')
 
@@ -148,18 +152,32 @@ def format_ctx_list(ctx_list):
         for pctx in ctx_list) + ')'
 
 
+def absorb_and_log_exceptions(ast_visitor):
+    @wraps(ast_visitor)
+    def wrapper(self, ctx):
+        try:
+            return ast_visitor(self, ctx)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
+            logger.warning('parsing error occured in {}:{} during {}'.format(self.source_unit_name, self.current_contract_name, ast_visitor.__name__))
+    return wrapper
+
+
 class DefinitionsRecorder(SolidityListener):
     def __init__(self, source_unit_name):
         self.current_contract_name = None
         self.source_unit_name = source_unit_name
 
+    @absorb_and_log_exceptions
     def enterContractDefinition(self, ctx):
         name = ctx.identifier().getText()
 
         if self.current_contract_name is not None:
-            raise RuntimeError('trying to enter {} while already in {}'.format(
+            logger.warning('trying to enter {} while already in {}'.format(
                 name,
                 self.current_contract_name))
+            return
 
         objtype = ctx.start.text
 
@@ -182,9 +200,11 @@ class DefinitionsRecorder(SolidityListener):
             docs=get_docs_from_comments_for_obj(ctx),
         )
 
+    @absorb_and_log_exceptions
     def exitContractDefinition(self, ctx):
         self.current_contract_name = None
 
+    @absorb_and_log_exceptions
     def enterStateVariableDeclaration(self, ctx):
         signature = ' '.join(
             child.getText() for child in takewhile(
@@ -202,6 +222,7 @@ class DefinitionsRecorder(SolidityListener):
             docs=get_docs_from_comments_for_obj(ctx),
         )
 
+    @absorb_and_log_exceptions
     def add_function_like_to_db(self, ctx):
         name = (ctx.identifier().getText()
                 if hasattr(ctx, 'identifier')
@@ -269,6 +290,7 @@ class DefinitionsRecorder(SolidityListener):
     enterModifierDefinition = add_function_like_to_db
     enterEventDefinition = add_function_like_to_db
 
+    @absorb_and_log_exceptions
     def enterStructDefinition(self, ctx):
         docs = get_docs_from_comments_for_obj(ctx)
 
@@ -285,6 +307,7 @@ class DefinitionsRecorder(SolidityListener):
             for vdctx in ctx.variableDeclaration()
         )
 
+    @absorb_and_log_exceptions
     def enterEnumDefinition(self, ctx):
         docs = get_docs_from_comments_for_obj(ctx)
 
