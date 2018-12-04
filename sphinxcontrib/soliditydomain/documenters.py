@@ -15,6 +15,14 @@ class SolidityObjectDocumenter(Documenter):
         'exclude-members': members_set_option,
     }
 
+    @classmethod
+    def can_document_member(cls, member, membername, isattr, parent):
+        # type: (Any, unicode, bool, Any) -> bool
+        """Called to see if a member of a Python object can be documented by this documenter.
+
+        Will always answer no because this Documenter is built for Solidity."""
+        return False
+
     def get_sourcename(self):
         return '{}:docstring of {} {}'.format(
             self.object.file,
