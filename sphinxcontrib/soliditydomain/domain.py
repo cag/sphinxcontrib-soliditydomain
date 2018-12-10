@@ -32,16 +32,16 @@ class SolidityObject(ObjectDescription):
         if fullname not in self.state.document.ids:
             signode['ids'].append(fullname2id(fullname))
             self.state.document.note_explicit_target(signode)
-            domaindata = self.env.domaindata['sol']
-            if fullname in domaindata:
+            objects = self.env.domaindata['sol']['objects']
+            if fullname in objects:
                 self.state_machine.reporter.warning(
                     'duplicate {type} description of {fullname}, '
                     'other instance in {otherloc}'.format(
                         type=self.objtype,
                         fullname=fullname,
-                        otherloc=domaindata[fullname][0],
+                        otherloc=objects[fullname][0],
                     ), line=self.lineno)
-                domaindata[fullname] = (self.env.docname, self.objtype)
+            objects[fullname] = (self.env.docname, self.objtype)
 
         indextext = '{} ({})'.format(fullname2namepath(fullname), _(self.objtype))
         if (self.objtype == 'constructor' or
@@ -331,6 +331,23 @@ class SolidityDomain(Domain):
         'enum':         SolidityXRefRole(),
     }
 
+    initial_data = {
+        'objects': {},
+    }
+
+    def clear_doc(self, docname):
+        # type: (unicode) -> None
+        for fullname, (fn, _l) in list(self.data['objects'].items()):
+            if fn == docname:
+                del self.data['objects'][fullname]
+
+    def merge_domaindata(self, docnames, otherdata):
+        # type: (List[unicode], Dict) -> None
+        # XXX check duplicates
+        for fullname, (fn, objtype) in otherdata['objects'].items():
+            if fn in docnames:
+                self.data['objects'][fullname] = (fn, objtype)
+
     def resolve_xref(self, env, fromdocname, builder,
                      typ, target, node, contnode):
         # type: (BuildEnvironment, unicode, Builder, unicode, unicode, nodes.Node, nodes.Node) -> nodes.Node  # NOQA
@@ -347,3 +364,7 @@ class SolidityDomain(Domain):
         The method can also raise :exc:`sphinx.environment.NoUri` to suppress
         the :event:`missing-reference` event being emitted.
         """
+        for fullname, (docname, objtype) in self.data['objects'].items():
+            if fullname.name == target:
+                return make_refnode(builder, fromdocname, docname, fullname2id(fullname), contnode, fullname.name)
+        return None
