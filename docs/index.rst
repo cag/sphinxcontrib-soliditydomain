@@ -8,6 +8,7 @@ Solidity Domain for Sphinx
    installation
    formatting
    autodoc
+   xrefs
 
 Indices and tables
 ==================
