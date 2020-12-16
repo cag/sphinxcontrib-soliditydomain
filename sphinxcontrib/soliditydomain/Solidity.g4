@@ -106,7 +106,7 @@ parameterList
   : '(' ( parameter (',' parameter)* )? ')' ;
 
 parameter
-  : typeName storageLocation? identifier? ;
+  : typeName PayableKeyword? storageLocation? identifier? ;
 
 eventParameterList
   : '(' ( eventParameter (',' eventParameter)* )? ')' ;
@@ -118,10 +118,10 @@ functionTypeParameterList
   : '(' ( functionTypeParameter (',' functionTypeParameter)* )? ')' ;
 
 functionTypeParameter
-  : typeName storageLocation? ;
+  : typeName PayableKeyword? storageLocation? ;
 
 variableDeclaration
-  : typeName storageLocation? identifier ;
+  : typeName PayableKeyword? storageLocation? identifier ;
 
 typeName
   : elementaryTypeName
