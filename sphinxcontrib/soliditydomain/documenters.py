@@ -1,7 +1,7 @@
 import re
 from sphinx.ext.autodoc import (
     ALL, Documenter,
-    bool_option, members_option, members_set_option)
+    bool_option, members_option, exclude_members_option)
 from .domain import SolidityDomain
 from .sourceregistry import SolidityObject
 
@@ -15,7 +15,7 @@ class SolidityObjectDocumenter(Documenter):
         'members': members_option,
         'undoc-members': bool_option,
         'noindex': bool_option,
-        'exclude-members': members_set_option,
+        'exclude-members': exclude_members_option,
     }
 
     @classmethod
