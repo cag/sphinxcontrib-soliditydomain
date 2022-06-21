@@ -12,6 +12,7 @@ from .SolidityLexer import SolidityLexer
 from .SolidityParser import SolidityParser
 from .SolidityListener import SolidityListener
 
+from sphinx.locale import __
 from sphinx.util.logging import getLogger
 logger = getLogger(__name__)
 
@@ -323,6 +324,7 @@ class DefinitionsRecorder(SolidityListener):
 
 
 def parse_sol(srcpath, relsrcpath):
+    logger.info(__('parsing %s'), srcpath)
     src = FileStream(srcpath, encoding='utf8')
     lexer = SolidityLexer(src)
     stream = CommonTokenStream(lexer)
