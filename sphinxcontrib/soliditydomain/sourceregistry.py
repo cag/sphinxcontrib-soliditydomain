@@ -225,9 +225,11 @@ class DefinitionsRecorder(SolidityListener):
 
     @absorb_and_log_exceptions
     def add_function_like_to_db(self, ctx):
-        name = (ctx.identifier().getText()
-                if hasattr(ctx, 'identifier')
-                and ctx.identifier() is not None else None)
+        if hasattr(ctx, 'functionDescriptor'):
+            identifier = ctx.functionDescriptor().identifier()
+            name = identifier is not None and identifier.getText() or None
+        else:
+            name = ctx.identifier().getText()
 
         if hasattr(ctx, 'parameterList') and ctx.parameterList() is not None:
             params = ctx.parameterList().parameter()
