@@ -124,7 +124,13 @@ class SolidityObjectDocumenter(Documenter):
 
             expressions.append(expr)
 
+        should_exclude_private = '<private>' in self.options.exclude_members
         for member in SolidityObject.select().where(*expressions):
+            if member.objtype == 'function':
+                is_public = 'public' in member.signature or 'external' in member.signature
+                if should_exclude_private and not is_public:
+                    continue
+
             self.add_line('', sourcename)
             full_mname = '{file}:{contract}{name}{paramtypes}'.format(
                 file=member.file,
