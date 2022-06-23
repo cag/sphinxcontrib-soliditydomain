@@ -76,11 +76,16 @@ param_re = re.compile(
 def get_docs_from_comments_for_obj(ctx):
     rawlines = []
 
+    num_spaces_to_strip = None
+
     for comment in ctx.parser._input.getHiddenTokensToLeft(
         ctx.start.tokenIndex
     ) or ():
         if comment.text.startswith('///'):
-            rawlines.append(comment.text[3:].strip())
+            text = comment.text[3:].rstrip()
+            if num_spaces_to_strip is None:
+                num_spaces_to_strip = len(text) - len(text.lstrip())
+            rawlines.append(text[num_spaces_to_strip:])
         elif comment.text.startswith('/**'):
             for rawline in comment.text[3:-2].splitlines():
                 rawlines.append(rawline.strip().lstrip('*').lstrip())
