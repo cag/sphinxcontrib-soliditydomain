@@ -46,6 +46,7 @@ def build_source_registry(app):
     lookup_path = app.env.config.autodoc_lookup_path
 
     for root, dirs, files in os.walk(lookup_path):
+        dirs[:] = (name for name in dirs if not name.startswith('.'))
         for name in files:
             if os.path.splitext(name)[1].lower() == '.sol':
                 parse_sol(os.path.join(root, name), relsrcpath=remove_prefix(
