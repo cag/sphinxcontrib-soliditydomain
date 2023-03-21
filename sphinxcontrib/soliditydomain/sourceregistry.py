@@ -12,6 +12,7 @@ from .SolidityLexer import SolidityLexer
 from .SolidityParser import SolidityParser
 from .SolidityListener import SolidityListener
 
+from sphinx.locale import __
 from sphinx.util.logging import getLogger
 logger = getLogger(__name__)
 
@@ -45,6 +46,7 @@ def build_source_registry(app):
     lookup_path = app.env.config.autodoc_lookup_path
 
     for root, dirs, files in os.walk(lookup_path):
+        dirs[:] = (name for name in dirs if not name.startswith('.'))
         for name in files:
             if os.path.splitext(name)[1].lower() == '.sol':
                 parse_sol(os.path.join(root, name), relsrcpath=remove_prefix(
@@ -75,11 +77,16 @@ param_re = re.compile(
 def get_docs_from_comments_for_obj(ctx):
     rawlines = []
 
+    num_spaces_to_strip = None
+
     for comment in ctx.parser._input.getHiddenTokensToLeft(
         ctx.start.tokenIndex
     ) or ():
         if comment.text.startswith('///'):
-            rawlines.append(comment.text[3:].strip())
+            text = comment.text[3:].rstrip()
+            if num_spaces_to_strip is None:
+                num_spaces_to_strip = len(text) - len(text.lstrip())
+            rawlines.append(text[num_spaces_to_strip:])
         elif comment.text.startswith('/**'):
             for rawline in comment.text[3:-2].splitlines():
                 rawlines.append(rawline.strip().lstrip('*').lstrip())
@@ -224,9 +231,11 @@ class DefinitionsRecorder(SolidityListener):
 
     @absorb_and_log_exceptions
     def add_function_like_to_db(self, ctx):
-        name = (ctx.identifier().getText()
-                if hasattr(ctx, 'identifier')
-                and ctx.identifier() is not None else None)
+        if hasattr(ctx, 'functionDescriptor'):
+            identifier = ctx.functionDescriptor().identifier()
+            name = identifier is not None and identifier.getText() or None
+        else:
+            name = ctx.identifier().getText()
 
         if hasattr(ctx, 'parameterList') and ctx.parameterList() is not None:
             params = ctx.parameterList().parameter()
@@ -323,6 +332,7 @@ class DefinitionsRecorder(SolidityListener):
 
 
 def parse_sol(srcpath, relsrcpath):
+    logger.info(__('parsing %s'), srcpath)
     src = FileStream(srcpath, encoding='utf8')
     lexer = SolidityLexer(src)
     stream = CommonTokenStream(lexer)
