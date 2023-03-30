@@ -86,7 +86,13 @@ usingForDeclaration
 
 usingForObject
   : userDefinedTypeName
-  | '{' userDefinedTypeName ( ',' userDefinedTypeName )* '}';
+  | '{' usingForObjectDirective ( ',' usingForObjectDirective )* '}';
+
+usingForObjectDirective
+  : userDefinedTypeName ( 'as' userDefinableOperators )?;
+
+userDefinableOperators
+  : '|' | '&' | '^' | '~' | '+' | '-' | '*' | '/' | '%' | '==' | '!=' | '<' | '>' | '<=' | '>=' ;
 
 structDefinition
   : 'struct' identifier
@@ -159,7 +165,10 @@ mappingKey
   | userDefinedTypeName ;
 
 mapping
-  : 'mapping' '(' mappingKey '=>' typeName ')' ;
+  : 'mapping' '(' mappingKey mappingKeyName? '=>' typeName mappingValueName? ')' ;
+
+mappingKeyName : identifier;
+mappingValueName : identifier;
 
 functionTypeName
   : 'function' functionTypeParameterList
@@ -283,7 +292,7 @@ expression
   | '(' expression ')'
   | ('++' | '--') expression
   | ('+' | '-') expression
-  | ('after' | 'delete') expression
+  | 'delete' expression
   | '!' expression
   | '~' expression
   | expression '**' expression
@@ -346,7 +355,6 @@ assemblyItem
   | BreakKeyword
   | ContinueKeyword
   | LeaveKeyword
-  | subAssembly
   | numberLiteral
   | stringLiteral
   | hexLiteral ;
@@ -364,10 +372,13 @@ assemblyLocalDefinition
   : 'let' assemblyIdentifierOrList ( ':=' assemblyExpression )? ;
 
 assemblyAssignment
-  : assemblyIdentifierOrList ':=' assemblyExpression ;
+  : assemblyIdentifierOrList ':=' assemblyExpression;
 
 assemblyIdentifierOrList
-  : identifier | assemblyMember | '(' assemblyIdentifierList ')' ;
+  : identifier
+  | assemblyMember
+  | assemblyIdentifierList
+  | '(' assemblyIdentifierList ')';
 
 assemblyIdentifierList
   : identifier ( ',' identifier )* ;
@@ -400,10 +411,7 @@ assemblyIf
   : 'if' assemblyExpression assemblyBlock ;
 
 assemblyLiteral
-  : stringLiteral | DecimalNumber | HexNumber | hexLiteral ;
-
-subAssembly
-  : 'assembly' identifier assemblyBlock ;
+  : stringLiteral | DecimalNumber | HexNumber | hexLiteral | BooleanLiteral ;
 
 tupleExpression
   : '(' ( expression? ( ',' expression? )* ) ')'
@@ -415,7 +423,7 @@ numberLiteral
 // some keywords need to be added here to avoid ambiguities
 // for example, "revert" is a keyword but it can also be a function name
 identifier
-  : ('from' | 'calldata' | 'receive' | 'callback' | 'revert' | 'error' | ConstructorKeyword | PayableKeyword | LeaveKeyword | Identifier) ;
+  : ('from' | 'calldata' | 'receive' | 'callback' | 'revert' | 'error' | 'address' | ConstructorKeyword | PayableKeyword | LeaveKeyword | Identifier) ;
 
 BooleanLiteral
   : 'true' | 'false' ;
